@@ -1,0 +1,236 @@
+package logger_test
+
+import (
+    "bytes"
+    "io"
+    "os"
+    "path/filepath"
+    "strings"
+    "testing"
+    "time"
+
+    "github.com/nir0k/logger"
+)
+
+func TestConsoleOutput(t *testing.T) {
+    // Create a buffer to capture console output
+    var consoleOutput bytes.Buffer
+
+    // Save the original os.Stdout
+    originalStdout := os.Stdout
+
+    // Create a pipe to redirect stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    config := logger.LogConfig{
+        Directory:      "./test_logs_console",
+        Format:         "standard",
+        FileLevel:      "debug",
+        ConsoleLevel:   "info",
+        ConsoleOutput:  true,
+        EnableRotation: false,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Start a goroutine to read from the pipe
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Log a test message
+    log.Info("Test informational message")
+
+    // Close the writer to finish the goroutine
+    w.Close()
+    <-done
+
+    // Restore the original os.Stdout
+    os.Stdout = originalStdout
+
+    // Check the console output for the test message
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Test informational message") {
+        t.Errorf("Message not found in console output")
+    }
+
+    // Remove the test log directory
+    os.RemoveAll("./test_logs_console")
+}
+
+func TestFileOutput(t *testing.T) {
+    // Create a temporary directory for logs
+    logDir, err := os.MkdirTemp("", "test_logs_file")
+    if err != nil {
+        t.Fatalf("Failed to create temporary directory: %v", err)
+    }
+    defer os.RemoveAll(logDir) // Clean up after the test
+
+    logFile := filepath.Join(logDir, "log.txt")
+
+    config := logger.LogConfig{
+        Directory:      logDir,
+        Format:         "standard",
+        FileLevel:      "debug",
+        ConsoleLevel:   "info",
+        ConsoleOutput:  false,
+        EnableRotation: false,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Log a test message
+    log.Info("Test informational message to file")
+
+    // Read the contents of the log file
+	data, err := os.ReadFile(logFile)
+    if err != nil {
+        t.Fatalf("Failed to read log file: %v", err)
+    }
+
+    content := string(data)
+    if !strings.Contains(content, "Test informational message to file") {
+        t.Errorf("Message not found in log file")
+    }
+}
+
+func TestLogRotation(t *testing.T) {
+    // Create a temporary directory for logs
+    logDir, err := os.MkdirTemp("", "test_logs_rotation")
+    if err != nil {
+        t.Fatalf("Failed to create temporary directory: %v", err)
+    }
+    defer os.RemoveAll(logDir) // Clean up after the test
+
+    logFileName := "log.txt"
+
+    config := logger.LogConfig{
+        Directory:      logDir,
+        Format:         "standard",
+        FileLevel:      "debug",
+        ConsoleLevel:   "info",
+        ConsoleOutput:  false,
+        EnableRotation: true,
+        RotationConfig: logger.RotationConfig{
+            MaxSize:    1, // 1 MB
+            MaxBackups: 2,
+            MaxAge:     1, // 1 day
+            Compress:   false,
+        },
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Write multiple small messages to exceed MaxSize
+    smallMessage := strings.Repeat("A", 1024*10) // 10 KB
+    messagesToWrite := 110                       // 110 * 10 KB = 1.1 MB
+
+    for i := 0; i < messagesToWrite; i++ {
+        log.Info("Message number", i, smallMessage)
+    }
+
+    // Wait for rotation to occur
+    time.Sleep(1 * time.Second)
+
+    // Check for rotated log files
+    files, err := os.ReadDir(logDir)
+    if err != nil {
+        t.Fatalf("Failed to read log directory: %v", err)
+    }
+
+    // Count the number of log files
+    logFiles := 0
+    for _, file := range files {
+        if file.Name() == logFileName || strings.HasPrefix(file.Name(), strings.TrimSuffix(logFileName, ".txt")) {
+            logFiles++
+            t.Logf("Found file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
+        }
+    }
+
+    if logFiles < 2 {
+        t.Errorf("Log rotation did not occur, found files: %d", logFiles)
+    }
+}
+
+func TestLogRotationWithCompression(t *testing.T) {
+    // Create a temporary directory for logs
+    logDir, err := os.MkdirTemp("", "test_logs_rotation_compress")
+    if err != nil {
+        t.Fatalf("Failed to create temporary directory: %v", err)
+    }
+    defer os.RemoveAll(logDir) // Clean up after the test
+
+    config := logger.LogConfig{
+        Directory:      logDir,
+        Format:         "standard",
+        FileLevel:      "debug",
+        ConsoleLevel:   "info",
+        ConsoleOutput:  false,
+        EnableRotation: true,
+        RotationConfig: logger.RotationConfig{
+            MaxSize:    1,  // 1 MB
+            MaxBackups: 2,
+            MaxAge:     1,  // 1 day
+            Compress:   true, // Enable compression
+        },
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Write multiple small messages to exceed MaxSize
+    smallMessage := strings.Repeat("A", 1024*10) // 10 KB
+    messagesToWrite := 110                       // 110 * 10 KB = 1.1 MB
+
+    for i := 0; i < messagesToWrite; i++ {
+        log.Info("Message number", i, smallMessage)
+    }
+
+    // Wait for rotation and compression to occur
+    time.Sleep(2 * time.Second)
+
+    // Check for compressed log files
+    files, err := os.ReadDir(logDir)
+    if err != nil {
+        t.Fatalf("Failed to read log directory: %v", err)
+    }
+
+    compressedFiles := 0
+    for _, file := range files {
+        if strings.HasSuffix(file.Name(), ".gz") {
+            compressedFiles++
+            t.Logf("Found compressed file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
+        } else {
+            t.Logf("Found file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
+        }
+    }
+
+    if compressedFiles == 0 {
+        t.Errorf("No compressed files found")
+    } else {
+        t.Logf("Number of compressed files: %d", compressedFiles)
+    }
+}
+
+// fileInfoSize returns the size of a file in bytes.
+func fileInfoSize(dir, name string) int64 {
+    info, err := os.Stat(filepath.Join(dir, name))
+    if err != nil {
+        return 0
+    }
+    return info.Size()
+}
