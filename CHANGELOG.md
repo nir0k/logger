@@ -2,6 +2,17 @@
 
 All significant changes to this project will be documented in this file.
 
+## [1.2.1] - 2024-11-10
+
+### Added
+
+- Added PID of the process to log messages.
+- Added file path and line number to log messages, trimmed to the project level.
+- Colorized console output based on log level.
+
+### Fixed
+
+- Corrected test cases to match the new log message format.
 
 ## [1.2.0] - 2024-11-09
 

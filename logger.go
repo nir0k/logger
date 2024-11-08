@@ -3,16 +3,18 @@
 package logger
 
 import (
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "os"
-    "strings"
-    "time"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
-    "github.com/fatih/color"
-    "github.com/natefinch/lumberjack"
+	"github.com/fatih/color"
+	"github.com/natefinch/lumberjack"
 )
 
 // LogConfig represents the configuration settings for the Logger.
@@ -163,8 +165,24 @@ func (l *Logger) log(level string, v ...interface{}) {
         return
     }
 
+    if msgLevel < l.FileLogLevel && msgLevel < l.ConsoleLogLevel {
+        return
+    }
+
     timestamp := time.Now().Format(time.RFC3339)
-    prefix := fmt.Sprintf("[%s] [%s] ", timestamp, strings.ToUpper(level))
+    pid := os.Getpid()
+
+    // Get the caller information
+    _, file, line, ok := runtime.Caller(2)
+    if !ok {
+        file = "unknown"
+        line = 0
+    } else {
+        // Trim the file path to the project level
+        file = trimPathToProject(file)
+    }
+
+    prefix := fmt.Sprintf("[%s] [PID: %d] [%s:%d] [%s] ", timestamp, pid, file, line, strings.ToUpper(level))
 
     var logEntry string
 
@@ -172,6 +190,9 @@ func (l *Logger) log(level string, v ...interface{}) {
         logData := map[string]interface{}{
             "timestamp": timestamp,
             "level":     level,
+            "pid":       pid,
+            "file":      file,
+            "line":      line,
             "message":   fmt.Sprint(v...),
         }
         jsonBytes, _ := json.Marshal(logData)
@@ -180,21 +201,61 @@ func (l *Logger) log(level string, v ...interface{}) {
         logEntry = prefix + fmt.Sprint(v...)
     }
 
-    // Log to file without color codes
-    if l.FileLogger != nil && msgLevel >= l.FileLogLevel {
+    if msgLevel >= l.FileLogLevel {
         l.FileLogger.Println(logEntry)
     }
 
-    // Log to console with color codes
-    if l.ConsoleLogger != nil && msgLevel >= l.ConsoleLogLevel {
-        colorizedEntry := l.colorize(level, logEntry)
-        l.ConsoleLogger.Println(colorizedEntry)
+    if l.Config.ConsoleOutput && msgLevel >= l.ConsoleLogLevel {
+        colorFunc := color.New(color.FgWhite).SprintFunc()
+        switch level {
+        case "trace":
+            colorFunc = color.New(color.FgCyan).SprintFunc()
+        case "debug":
+            colorFunc = color.New(color.FgBlue).SprintFunc()
+        case "info":
+            colorFunc = color.New(color.FgGreen).SprintFunc()
+        case "warning":
+            colorFunc = color.New(color.FgYellow).SprintFunc()
+        case "error":
+            colorFunc = color.New(color.FgRed).SprintFunc()
+        case "fatal":
+            colorFunc = color.New(color.FgHiRed).SprintFunc()
+        }
+        l.ConsoleLogger.Println(colorFunc(logEntry))
     }
+}
 
-    // Exit the program if the log level is fatal
-    if level == "fatal" {
-        os.Exit(1)
+// trimPathToProject trims the file path to the project level.
+func trimPathToProject(filePath string) string {
+    // Assuming the project directory is the one containing the "go.mod" file
+    projectDir := findProjectDir()
+    if projectDir == "" {
+        return filepath.Base(filePath)
     }
+    relPath, err := filepath.Rel(projectDir, filePath)
+    if err != nil {
+        return filepath.Base(filePath)
+    }
+    return relPath
+}
+
+// findProjectDir finds the project directory by looking for the "go.mod" file.
+func findProjectDir() string {
+    dir, err := os.Getwd()
+    if err != nil {
+        return ""
+    }
+    for {
+        if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+            return dir
+        }
+        parentDir := filepath.Dir(dir)
+        if parentDir == dir {
+            break
+        }
+        dir = parentDir
+    }
+    return ""
 }
 
 // colorize applies color to the log message based on the log level.
@@ -245,6 +306,7 @@ func (l *Logger) Error(v ...interface{}) {
 // Fatal logs a message at the FATAL level and exits the application.
 func (l *Logger) Fatal(v ...interface{}) {
     l.log("fatal", v...)
+    os.Exit(1)
 }
 
 // Tracef logs a formatted message at the TRACE level.

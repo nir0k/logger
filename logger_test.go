@@ -300,19 +300,26 @@ func TestLogMethods(t *testing.T) {
     }()
 
     // Log test messages
-    log.Tracef("Tracef message: %d", 1)
-    log.Debugf("Debugf message: %d", 2)
-    log.Infof("Infof message: %d", 3)
-    log.Warningf("Warningf message: %d", 4)
-    log.Errorf("Errorf message: %d", 5)
-    // log.Fatalf("Fatalf message: %d", 6) // Uncomment to test Fatalf (will exit the test)
+    log.Trace("TRACE level message")
+    log.Debug("Debug message")
+    log.Info("Informational message")
+    log.Warning("Warning")
+    log.Error("Error message")
+    // log.Fatal("Critical error, application will terminate")
 
-    log.Traceln("Traceln message")
-    log.Debugln("Debugln message")
-    log.Infoln("Infoln message")
-    log.Warningln("Warningln message")
-    log.Errorln("Errorln message")
-    // log.Fatalln("Fatalln message") // Uncomment to test Fatalln (will exit the test)
+    log.Tracef("TRACE level message: %d", 1)
+    log.Debugf("Debug message: %d", 2)
+    log.Infof("Informational message: %d", 3)
+    log.Warningf("Warning message: %d", 4)
+    log.Errorf("Error message: %d", 5)
+    // log.Fatalf("Critical error, application will terminate: %d", 6)
+
+    log.Traceln("TRACE level message with newline")
+    log.Debugln("Debug message with newline")
+    log.Infoln("Informational message with newline")
+    log.Warningln("Warning message with newline")
+    log.Errorln("Error message with newline")
+    // log.Fatalln("Critical error, application will terminate with newline")
 
     // Close the writer to finish the goroutine
     w.Close()
@@ -323,35 +330,43 @@ func TestLogMethods(t *testing.T) {
 
     // Check the console output for the test messages
     output := consoleOutput.String()
-    if !strings.Contains(output, "Tracef message: 1") {
-        t.Errorf("Expected 'Tracef message: 1' in output, got '%s'", output)
+    lines := strings.Split(output, "\n")
+
+    for i, line := range lines {
+        if i > 0 && line != "" && !strings.HasPrefix(line, "[") {
+            t.Errorf("Expected new log entry to start with '[', got '%s'", line)
+        }
     }
-    if !strings.Contains(output, "Debugf message: 2") {
-        t.Errorf("Expected 'Debugf message: 2' in output, got '%s'", output)
+
+    if !strings.Contains(output, "TRACE level message: 1") {
+        t.Errorf("Expected 'TRACE level message: 1' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Infof message: 3") {
-        t.Errorf("Expected 'Infof message: 3' in output, got '%s'", output)
+    if !strings.Contains(output, "Debug message: 2") {
+        t.Errorf("Expected 'Debug message: 2' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Warningf message: 4") {
-        t.Errorf("Expected 'Warningf message: 4' in output, got '%s'", output)
+    if !strings.Contains(output, "Informational message: 3") {
+        t.Errorf("Expected 'Informational message: 3' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Errorf message: 5") {
-        t.Errorf("Expected 'Errorf message: 5' in output, got '%s'", output)
+    if !strings.Contains(output, "Warning message: 4") {
+        t.Errorf("Expected 'Warning message: 4' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Traceln message") {
-        t.Errorf("Expected 'Traceln message' in output, got '%s'", output)
+    if !strings.Contains(output, "Error message: 5") {
+        t.Errorf("Expected 'Error message: 5' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Debugln message") {
-        t.Errorf("Expected 'Debugln message' in output, got '%s'", output)
+    if !strings.Contains(output, "TRACE level message with newline") {
+        t.Errorf("Expected 'TRACE level message with newline' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Infoln message") {
-        t.Errorf("Expected 'Infoln message' in output, got '%s'", output)
+    if !strings.Contains(output, "Debug message with newline") {
+        t.Errorf("Expected 'Debug message with newline' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Warningln message") {
-        t.Errorf("Expected 'Warningln message' in output, got '%s'", output)
+    if !strings.Contains(output, "Informational message with newline") {
+        t.Errorf("Expected 'Informational message with newline' in output, got '%s'", output)
     }
-    if !strings.Contains(output, "Errorln message") {
-        t.Errorf("Expected 'Errorln message' in output, got '%s'", output)
+    if !strings.Contains(output, "Warning message with newline") {
+        t.Errorf("Expected 'Warning message with newline' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Error message with newline") {
+        t.Errorf("Expected 'Error message with newline' in output, got '%s'", output)
     }
 
     // Remove the test log directory
