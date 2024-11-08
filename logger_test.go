@@ -266,3 +266,94 @@ func TestDefaultConfig(t *testing.T) {
         t.Errorf("Expected default RotationConfig.MaxAge to be 30, got %d", log.Config.RotationConfig.MaxAge)
     }
 }
+
+func TestLogMethods(t *testing.T) {
+    // Create a buffer to capture console output
+    var consoleOutput bytes.Buffer
+
+    // Save the original os.Stdout
+    originalStdout := os.Stdout
+
+    // Create a pipe to redirect stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    config := logger.LogConfig{
+        Directory:      "./test_logs_methods",
+        Format:         "standard",
+        FileLevel:      "trace",
+        ConsoleLevel:   "trace",
+        ConsoleOutput:  true,
+        EnableRotation: false,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Start a goroutine to read from the pipe
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Log test messages
+    log.Tracef("Tracef message: %d", 1)
+    log.Debugf("Debugf message: %d", 2)
+    log.Infof("Infof message: %d", 3)
+    log.Warningf("Warningf message: %d", 4)
+    log.Errorf("Errorf message: %d", 5)
+    // log.Fatalf("Fatalf message: %d", 6) // Uncomment to test Fatalf (will exit the test)
+
+    log.Traceln("Traceln message")
+    log.Debugln("Debugln message")
+    log.Infoln("Infoln message")
+    log.Warningln("Warningln message")
+    log.Errorln("Errorln message")
+    // log.Fatalln("Fatalln message") // Uncomment to test Fatalln (will exit the test)
+
+    // Close the writer to finish the goroutine
+    w.Close()
+    <-done
+
+    // Restore the original os.Stdout
+    os.Stdout = originalStdout
+
+    // Check the console output for the test messages
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Tracef message: 1") {
+        t.Errorf("Expected 'Tracef message: 1' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Debugf message: 2") {
+        t.Errorf("Expected 'Debugf message: 2' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Infof message: 3") {
+        t.Errorf("Expected 'Infof message: 3' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Warningf message: 4") {
+        t.Errorf("Expected 'Warningf message: 4' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Errorf message: 5") {
+        t.Errorf("Expected 'Errorf message: 5' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Traceln message") {
+        t.Errorf("Expected 'Traceln message' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Debugln message") {
+        t.Errorf("Expected 'Debugln message' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Infoln message") {
+        t.Errorf("Expected 'Infoln message' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Warningln message") {
+        t.Errorf("Expected 'Warningln message' in output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Errorln message") {
+        t.Errorf("Expected 'Errorln message' in output, got '%s'", output)
+    }
+
+    // Remove the test log directory
+    os.RemoveAll("./test_logs_methods")
+}

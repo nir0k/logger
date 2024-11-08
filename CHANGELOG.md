@@ -2,6 +2,7 @@
 
 All significant changes to this project will be documented in this file.
 
+
 ## [1.2.0] - 2024-11-09
 
 ### Added
@@ -15,6 +16,10 @@ All significant changes to this project will be documented in this file.
   - `RotationConfig.MaxBackups` defaults to `7`.
   - `RotationConfig.MaxAge` defaults to `30` days.
 - New test `TestDefaultConfig` to verify that default values are correctly set when not provided in the configuration.
+- Added methods for formatted and newline log messages:
+  - `Tracef`, `Debugf`, `Infof`, `Warningf`, `Errorf`, `Fatalf` for formatted log messages.
+  - `Traceln`, `Debugln`, `Infoln`, `Warningln`, `Errorln`, `Fatalln` for log messages with a newline.
+- New test `TestLogMethods` to verify that the new log methods (`Tracef`, `Debugf`, `Infof`, `Warningf`, `Errorf`, `Traceln`, `Debugln`, `Infoln`, `Warningln`, `Errorln`) work correctly.
 
 ## [1.1.0] - 2024-11-08
 

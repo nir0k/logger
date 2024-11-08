@@ -51,6 +51,20 @@ func main() {
     log.Warning("Warning")
     log.Error("Error message")
     // log.Fatal("Critical error, application will terminate")
+
+    log.Tracef("TRACE level message: %d", 1)
+    log.Debugf("Debug message: %d", 2)
+    log.Infof("Informational message: %d", 3)
+    log.Warningf("Warning message: %d", 4)
+    log.Errorf("Error message: %d", 5)
+    // log.Fatalf("Critical error, application will terminate: %d", 6)
+
+    log.Traceln("TRACE level message with newline")
+    log.Debugln("Debug message with newline")
+    log.Infoln("Informational message with newline")
+    log.Warningln("Warning message with newline")
+    log.Errorln("Error message with newline")
+    // log.Fatalln("Critical error, application will terminate with newline")
 }
 ```
 

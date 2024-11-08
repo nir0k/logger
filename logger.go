@@ -246,3 +246,65 @@ func (l *Logger) Error(v ...interface{}) {
 func (l *Logger) Fatal(v ...interface{}) {
     l.log("fatal", v...)
 }
+
+// Tracef logs a formatted message at the TRACE level.
+func (l *Logger) Tracef(format string, v ...interface{}) {
+    l.log("trace", fmt.Sprintf(format, v...))
+}
+
+// Debugf logs a formatted message at the DEBUG level.
+func (l *Logger) Debugf(format string, v ...interface{}) {
+    l.log("debug", fmt.Sprintf(format, v...))
+}
+
+// Infof logs a formatted message at the INFO level.
+func (l *Logger) Infof(format string, v ...interface{}) {
+    l.log("info", fmt.Sprintf(format, v...))
+}
+
+// Warningf logs a formatted message at the WARNING level.
+func (l *Logger) Warningf(format string, v ...interface{}) {
+    l.log("warning", fmt.Sprintf(format, v...))
+}
+
+// Errorf logs a formatted message at the ERROR level.
+func (l *Logger) Errorf(format string, v ...interface{}) {
+    l.log("error", fmt.Sprintf(format, v...))
+}
+
+// Fatalf logs a formatted message at the FATAL level and exits the application.
+func (l *Logger) Fatalf(format string, v ...interface{}) {
+    l.log("fatal", fmt.Sprintf(format, v...))
+    os.Exit(1)
+}
+
+// Traceln logs a message at the TRACE level with a newline.
+func (l *Logger) Traceln(v ...interface{}) {
+    l.log("trace", fmt.Sprintln(v...))
+}
+
+// Debugln logs a message at the DEBUG level with a newline.
+func (l *Logger) Debugln(v ...interface{}) {
+    l.log("debug", fmt.Sprintln(v...))
+}
+
+// Infoln logs a message at the INFO level with a newline.
+func (l *Logger) Infoln(v ...interface{}) {
+    l.log("info", fmt.Sprintln(v...))
+}
+
+// Warningln logs a message at the WARNING level with a newline.
+func (l *Logger) Warningln(v ...interface{}) {
+    l.log("warning", fmt.Sprintln(v...))
+}
+
+// Errorln logs a message at the ERROR level with a newline.
+func (l *Logger) Errorln(v ...interface{}) {
+    l.log("error", fmt.Sprintln(v...))
+}
+
+// Fatalln logs a message at the FATAL level with a newline and exits the application.
+func (l *Logger) Fatalln(v ...interface{}) {
+    l.log("fatal", fmt.Sprintln(v...))
+    os.Exit(1)
+}
