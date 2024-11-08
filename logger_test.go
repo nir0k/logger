@@ -234,3 +234,35 @@ func fileInfoSize(dir, name string) int64 {
     }
     return info.Size()
 }
+
+func TestDefaultConfig(t *testing.T) {
+    config := logger.LogConfig{}
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Проверяем значения по умолчанию
+    if log.Config.Directory != "./logs" {
+        t.Errorf("Expected default Directory to be './logs', got '%s'", log.Config.Directory)
+    }
+    if log.Config.Format != "standard" {
+        t.Errorf("Expected default Format to be 'standard', got '%s'", log.Config.Format)
+    }
+    if log.Config.FileLevel != "info" {
+        t.Errorf("Expected default FileLevel to be 'info', got '%s'", log.Config.FileLevel)
+    }
+    if log.Config.ConsoleLevel != "info" {
+        t.Errorf("Expected default ConsoleLevel to be 'info', got '%s'", log.Config.ConsoleLevel)
+    }
+    if log.Config.RotationConfig.MaxSize != 10 {
+        t.Errorf("Expected default RotationConfig.MaxSize to be 100, got %d", log.Config.RotationConfig.MaxSize)
+    }
+    if log.Config.RotationConfig.MaxBackups != 7 {
+        t.Errorf("Expected default RotationConfig.MaxBackups to be 7, got %d", log.Config.RotationConfig.MaxBackups)
+    }
+    if log.Config.RotationConfig.MaxAge != 30 {
+        t.Errorf("Expected default RotationConfig.MaxAge to be 30, got %d", log.Config.RotationConfig.MaxAge)
+    }
+}

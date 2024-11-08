@@ -2,6 +2,20 @@
 
 All significant changes to this project will be documented in this file.
 
+## [1.2.0] - 2024-11-09
+
+### Added
+
+- Default values for `LogConfig` fields if they are not provided:
+  - `Directory` defaults to `./logs`.
+  - `Format` defaults to `standard`.
+  - `FileLevel` defaults to `info`.
+  - `ConsoleLevel` defaults to `info`.
+  - `RotationConfig.MaxSize` defaults to `100` MB.
+  - `RotationConfig.MaxBackups` defaults to `7`.
+  - `RotationConfig.MaxAge` defaults to `30` days.
+- New test `TestDefaultConfig` to verify that default values are correctly set when not provided in the configuration.
+
 ## [1.1.0] - 2024-11-08
 
 ### Added

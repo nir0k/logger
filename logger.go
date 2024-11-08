@@ -36,12 +36,37 @@ type RotationConfig struct {
 
 // Logger represents a customizable logger with various configuration options.
 type Logger struct {
-    fileLogger      *log.Logger
-    consoleLogger   *log.Logger
-    config          LogConfig
-    fileLogLevel    int
-    consoleLogLevel int
-    logLevelMap     map[string]int
+    FileLogger      *log.Logger
+    ConsoleLogger   *log.Logger
+    Config          LogConfig
+    FileLogLevel    int
+    ConsoleLogLevel int
+    LogLevelMap     map[string]int
+}
+
+// setDefaults sets default values for the logger configuration.
+func setDefaults(config *LogConfig) {
+    if config.Directory == "" {
+        config.Directory = "./logs"
+    }
+    if config.Format == "" {
+        config.Format = "standard"
+    }
+    if config.FileLevel == "" {
+        config.FileLevel = "info"
+    }
+    if config.ConsoleLevel == "" {
+        config.ConsoleLevel = "info"
+    }
+    if config.RotationConfig.MaxSize == 0 {
+        config.RotationConfig.MaxSize = 10 // 100 MB
+    }
+    if config.RotationConfig.MaxBackups == 0 {
+        config.RotationConfig.MaxBackups = 7 // 7 backups
+    }
+    if config.RotationConfig.MaxAge == 0 {
+        config.RotationConfig.MaxAge = 30 // 30 days
+    }
 }
 
 // NewLogger creates a new Logger instance with the specified configuration.
@@ -64,9 +89,12 @@ type Logger struct {
 //   - If the log directory could not be created.
 //   - If the log file could not be opened.
 func NewLogger(config LogConfig) (*Logger, error) {
+    // Устанавливаем значения по умолчанию
+    setDefaults(&config)
+
     l := &Logger{
-        config: config,
-        logLevelMap: map[string]int{
+        Config: config,
+        LogLevelMap: map[string]int{
             "trace":   0,
             "debug":   1,
             "info":    2,
@@ -77,18 +105,18 @@ func NewLogger(config LogConfig) (*Logger, error) {
     }
 
     // Set the file log level
-    fileLevel, ok := l.logLevelMap[strings.ToLower(config.FileLevel)]
+    fileLevel, ok := l.LogLevelMap[strings.ToLower(config.FileLevel)]
     if !ok {
         return nil, fmt.Errorf("invalid file log level: %s", config.FileLevel)
     }
-    l.fileLogLevel = fileLevel
+    l.FileLogLevel = fileLevel
 
     // Set the console log level
-    consoleLevel, ok := l.logLevelMap[strings.ToLower(config.ConsoleLevel)]
+    consoleLevel, ok := l.LogLevelMap[strings.ToLower(config.ConsoleLevel)]
     if !ok {
         return nil, fmt.Errorf("invalid console log level: %s", config.ConsoleLevel)
     }
-    l.consoleLogLevel = consoleLevel
+    l.ConsoleLogLevel = consoleLevel
 
     // Check and create the log directory if it does not exist
     if _, err := os.Stat(config.Directory); os.IsNotExist(err) {
@@ -118,11 +146,11 @@ func NewLogger(config LogConfig) (*Logger, error) {
         fileWriter = file
     }
 
-    l.fileLogger = log.New(fileWriter, "", 0)
+    l.FileLogger = log.New(fileWriter, "", 0)
 
     // Setup console output
     if config.ConsoleOutput {
-        l.consoleLogger = log.New(os.Stdout, "", 0)
+        l.ConsoleLogger = log.New(os.Stdout, "", 0)
     }
 
     return l, nil
@@ -130,7 +158,7 @@ func NewLogger(config LogConfig) (*Logger, error) {
 
 // log is an internal method that logs messages with the given level and arguments.
 func (l *Logger) log(level string, v ...interface{}) {
-    msgLevel, ok := l.logLevelMap[level]
+    msgLevel, ok := l.LogLevelMap[level]
     if !ok {
         return
     }
@@ -140,7 +168,7 @@ func (l *Logger) log(level string, v ...interface{}) {
 
     var logEntry string
 
-    if strings.ToLower(l.config.Format) == "json" {
+    if strings.ToLower(l.Config.Format) == "json" {
         logData := map[string]interface{}{
             "timestamp": timestamp,
             "level":     level,
@@ -153,14 +181,14 @@ func (l *Logger) log(level string, v ...interface{}) {
     }
 
     // Log to file without color codes
-    if l.fileLogger != nil && msgLevel >= l.fileLogLevel {
-        l.fileLogger.Println(logEntry)
+    if l.FileLogger != nil && msgLevel >= l.FileLogLevel {
+        l.FileLogger.Println(logEntry)
     }
 
     // Log to console with color codes
-    if l.consoleLogger != nil && msgLevel >= l.consoleLogLevel {
+    if l.ConsoleLogger != nil && msgLevel >= l.ConsoleLogLevel {
         colorizedEntry := l.colorize(level, logEntry)
-        l.consoleLogger.Println(colorizedEntry)
+        l.ConsoleLogger.Println(colorizedEntry)
     }
 
     // Exit the program if the log level is fatal

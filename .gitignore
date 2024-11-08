@@ -35,3 +35,4 @@ go.work.sum
 # Логи и временные файлы
 *.log
 *.tmp
+logs/
