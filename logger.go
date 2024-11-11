@@ -20,19 +20,23 @@ import (
 // Global variable for the logger instance
 var logInstance *Logger
 
-// InitLogger initializes the logger and saves the instance in logInstance
+// InitLogger initializes the logger and saves the instance in logInstance.
 func InitLogger(config LogConfig) error {
     var err error
     logInstance, err = NewLogger(config)
+    if err != nil {
+        // Вывод сообщения об ошибке в консоль
+        fmt.Println("Logger initialization failed:", err)
+    }
     return err
 }
 
 // LogConfig represents the configuration settings for the Logger.
 type LogConfig struct {
-    Directory      string         // Directory where log files will be stored.
+    FilePath       string         // Full path to the log file.
     Format         string         // Log format: "standard" or "json".
-    FileLevel      string         // Minimum log level for file output: "trace", "debug", "info", "warning", "error", "fatal".
-    ConsoleLevel   string         // Minimum log level for console output: "trace", "debug", "info", "warning", "error", "fatal".
+    FileLevel      interface{}    // Log level for file output: can be string or int.
+    ConsoleLevel   interface{}    // Log level for console output: can be string or int.
     ConsoleOutput  bool           // Whether to output logs to the console.
     EnableRotation bool           // Whether to enable log rotation.
     RotationConfig RotationConfig // Settings for log rotation.
@@ -58,17 +62,14 @@ type Logger struct {
 
 // setDefaults sets default values for the logger configuration.
 func setDefaults(config *LogConfig) {
-    if config.Directory == "" {
-        config.Directory = "./logs"
-    }
     if config.Format == "" {
         config.Format = "standard"
     }
-    if config.FileLevel == "" {
-        config.FileLevel = "info"
+    if config.FileLevel == nil {
+        config.FileLevel = "warning"
     }
-    if config.ConsoleLevel == "" {
-        config.ConsoleLevel = "info"
+    if config.ConsoleLevel == nil {
+        config.ConsoleLevel = "warning"
     }
     if config.RotationConfig.MaxSize == 0 {
         config.RotationConfig.MaxSize = 10 // 10 MB
@@ -82,8 +83,6 @@ func setDefaults(config *LogConfig) {
 }
 
 // NewLogger creates a new Logger instance with the specified configuration.
-//
-// Returns an error if the log level is invalid or if there is an issue creating the log directory or files.
 func NewLogger(config LogConfig) (*Logger, error) {
     // Устанавливаем значения по умолчанию
     setDefaults(&config)
@@ -100,57 +99,77 @@ func NewLogger(config LogConfig) (*Logger, error) {
         },
     }
 
-    // Set the file log level
-    fileLevel, ok := l.LogLevelMap[strings.ToLower(config.FileLevel)]
-    if !ok {
-        return nil, fmt.Errorf("invalid file log level: %s", config.FileLevel)
+    // Функция для получения числового значения уровня логирования
+    getLogLevel := func(level interface{}) (int, error) {
+        switch v := level.(type) {
+        case string:
+            logLevel, ok := l.LogLevelMap[strings.ToLower(v)]
+            if !ok {
+                return 0, fmt.Errorf("invalid log level: %s", v)
+            }
+            return logLevel, nil
+        case int:
+            if v < 0 || v > 5 {
+                return 0, fmt.Errorf("numeric log level out of range: %d (valid range is 0 to 5)", v)
+            }
+            return v, nil
+        default:
+            return 0, fmt.Errorf("invalid type for log level: %T", v)
+        }
+    }
+
+    // Устанавливаем уровни логирования для файла и консоли
+    fileLevel, err := getLogLevel(config.FileLevel)
+    if err != nil {
+        fmt.Println("Invalid file log level:", err)
+        return nil, fmt.Errorf("invalid file log level: %v", err)
     }
     l.FileLogLevel = fileLevel
 
-    // Set the console log level
-    consoleLevel, ok := l.LogLevelMap[strings.ToLower(config.ConsoleLevel)]
-    if !ok {
-        return nil, fmt.Errorf("invalid console log level: %s", config.ConsoleLevel)
+    consoleLevel, err := getLogLevel(config.ConsoleLevel)
+    if err != nil {
+        fmt.Println("Invalid console log level:", err)
+        return nil, fmt.Errorf("invalid console log level: %v", err)
     }
     l.ConsoleLogLevel = consoleLevel
 
-    // Check and create the log directory if it does not exist
-    if _, err := os.Stat(config.Directory); os.IsNotExist(err) {
-        err = os.MkdirAll(config.Directory, 0755)
-        if err != nil {
-            return nil, fmt.Errorf("failed to create log directory: %v", err)
+    // Настройка логирования в файл, если указан путь
+    if config.FilePath != "" {
+        dir := filepath.Dir(config.FilePath)
+        if _, err := os.Stat(dir); os.IsNotExist(err) {
+            return nil, fmt.Errorf("log directory does not exist: %s", dir)
         }
-    }
 
-    logFilePath := fmt.Sprintf("%s/log.txt", strings.TrimRight(config.Directory, "/"))
-
-    // Setup file output
-    var fileWriter io.Writer
-    if config.EnableRotation {
-        fileWriter = &lumberjack.Logger{
-            Filename:   logFilePath,
-            MaxSize:    config.RotationConfig.MaxSize,
-            MaxBackups: config.RotationConfig.MaxBackups,
-            MaxAge:     config.RotationConfig.MaxAge,
-            Compress:   config.RotationConfig.Compress,
+        var fileWriter io.Writer
+        if config.EnableRotation {
+            fileWriter = &lumberjack.Logger{
+                Filename:   config.FilePath,
+                MaxSize:    config.RotationConfig.MaxSize,
+                MaxBackups: config.RotationConfig.MaxBackups,
+                MaxAge:     config.RotationConfig.MaxAge,
+                Compress:   config.RotationConfig.Compress,
+            }
+        } else {
+            file, err := os.OpenFile(config.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+            if err != nil {
+                return nil, fmt.Errorf("failed to open log file: %v", err)
+            }
+            fileWriter = file
         }
+
+        l.FileLogger = log.New(fileWriter, "", 0)
     } else {
-        file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-        if err != nil {
-            return nil, fmt.Errorf("failed to open log file: %v", err)
-        }
-        fileWriter = file
+        l.FileLogger = nil // No file logger if FilePath is not set
     }
 
-    l.FileLogger = log.New(fileWriter, "", 0)
-
-    // Setup console output
+    // Настройка вывода на консоль
     if config.ConsoleOutput {
         l.ConsoleLogger = log.New(os.Stdout, "", 0)
     }
 
     return l, nil
 }
+
 
 // log is an internal method that logs messages with the given level and arguments.
 func (l *Logger) log(level string, v ...interface{}) {
@@ -195,10 +214,12 @@ func (l *Logger) log(level string, v ...interface{}) {
         logEntry = prefix + fmt.Sprint(v...)
     }
 
-    if msgLevel >= l.FileLogLevel {
+    // Log to file only if the file logger is set and the level meets the threshold
+    if l.FileLogger != nil && msgLevel >= l.FileLogLevel {
         l.FileLogger.Println(logEntry)
     }
 
+    // Log to console if enabled and the level meets the threshold
     if l.Config.ConsoleOutput && msgLevel >= l.ConsoleLogLevel {
         colorFunc := color.New(color.FgWhite).SprintFunc()
         switch level {
@@ -250,6 +271,14 @@ func findProjectDir() string {
         dir = parentDir
     }
     return ""
+}
+
+// GetLoggerConfig returns the current logger configuration.
+func GetLoggerConfig() LogConfig {
+    if logInstance != nil {
+        return logInstance.Config
+    }
+    return LogConfig{}
 }
 
 // Пакетные функции-обёртки для методов логгера

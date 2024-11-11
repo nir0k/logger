@@ -4,7 +4,7 @@
 
 ## Description
 
-This project is a simple logger written in the Go programming language. The logger allows you to log messages with various levels of importance (informational, warnings, errors, etc.) to a file and to the console.
+This project is a customizable logger written in the Go programming language. The logger allows you to log messages with various levels of importance (trace, debug, info, warning, error, fatal) to a file and/or to the console. It supports different log formats, log rotation, and allows specifying log levels using either strings or numeric values.
 
 ## Installation
 
@@ -27,11 +27,12 @@ import (
 
 func main() {
     config := logger.LogConfig{
-        Directory:     "./logs",
-        Format:        "standard", // or "json"
-        Level:         "trace",
-        ConsoleOutput: true,
-        EnableRotation: true,
+        FilePath:      "./logs/app.log",   // Path to the log file
+        Format:        "standard",         // or "json"
+        FileLevel:     "debug",            // Log level for file output (string or int)
+        ConsoleLevel:  1,                  // Log level for console output (string or int)
+        ConsoleOutput: true,               // Enable console output
+        EnableRotation: true,              // Enable log rotation
         RotationConfig: logger.RotationConfig{
             MaxSize:    10,   // 10 MB
             MaxBackups: 3,    // Keep up to 3 backup copies
@@ -40,54 +41,196 @@ func main() {
         },
     }
 
-    log, err := logger.NewLogger(config)
+    // Initialize the logger with the configuration
+    err := logger.InitLogger(config)
     if err != nil {
+        // Handle the error (error messages are also printed to the console)
         panic(err)
     }
 
-    log.Trace("TRACE level message")
-    log.Debug("Debug message")
-    log.Info("Informational message")
-    log.Warning("Warning")
-    log.Error("Error message")
-    // log.Fatal("Critical error, application will terminate")
+    // Use the logger
+    logger.Trace("TRACE level message")
+    logger.Debug("Debug message")
+    logger.Info("Informational message")
+    logger.Warning("Warning")
+    logger.Error("Error message")
+    // logger.Fatal("Critical error, application will terminate")
 
-    log.Tracef("TRACE level message: %d", 1)
-    log.Debugf("Debug message: %d", 2)
-    log.Infof("Informational message: %d", 3)
-    log.Warningf("Warning message: %d", 4)
-    log.Errorf("Error message: %d", 5)
-    // log.Fatalf("Critical error, application will terminate: %d", 6)
+    logger.Tracef("TRACE level message: %d", 1)
+    logger.Debugf("Debug message: %d", 2)
+    logger.Infof("Informational message: %d", 3)
+    logger.Warningf("Warning message: %d", 4)
+    logger.Errorf("Error message: %d", 5)
+    // logger.Fatalf("Critical error, application will terminate: %d", 6)
 
-    log.Traceln("TRACE level message with newline")
-    log.Debugln("Debug message with newline")
-    log.Infoln("Informational message with newline")
-    log.Warningln("Warning message with newline")
-    log.Errorln("Error message with newline")
-    // log.Fatalln("Critical error, application will terminate with newline")
+    logger.Traceln("TRACE level message with newline")
+    logger.Debugln("Debug message with newline")
+    logger.Infoln("Informational message with newline")
+    logger.Warningln("Warning message with newline")
+    logger.Errorln("Error message with newline")
+    // logger.Fatalln("Critical error, application will terminate with newline")
+}
+
+```
+**Note**: The `log.Fatal` lines are commented out because they will terminate the application immediately after logging the message.
+
+
+## Using an Instance of Logger (Optional)
+If you prefer to use an instance of the logger rather than the package-level functions, you can create a new logger instance:
+```go
+package main
+
+import (
+    "github.com/nir0k/logger"
+)
+
+func main() {
+    config := logger.LogConfig{
+        FilePath:      "./logs/app.log",
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "debug",
+        ConsoleOutput: true,
+        EnableRotation: true,
+        RotationConfig: logger.RotationConfig{
+            MaxSize:    10,
+            MaxBackups: 3,
+            MaxAge:     7,
+            Compress:   true,
+        },
+    }
+
+    // Create a new logger instance
+    logInstance, err := logger.NewLogger(config)
+    if err != nil {
+        // Handle the error (error messages are also printed to the console)
+        panic(err)
+    }
+
+    // Use the logger instance
+    logInstance.Trace("TRACE level message")
+    logInstance.Debug("Debug message")
+    logInstance.Info("Informational message")
+    logInstance.Warning("Warning")
+    logInstance.Error("Error message")
+    // logInstance.Fatal("Critical error, application will terminate")
+
+    // ... (similar for other log methods)
 }
 ```
-Note: The `log.Fatal` lines are commented out because they will terminate the application immediately after logging the message.
 
+## LogConfig Parameters
+The `LogConfig` structure provides flexible configuration for the logger. Below is a description of each parameter:
+```go
+type LogConfig struct {
+    FilePath       string         // Full path to the log file.
+    Format         string         // Log format: "standard" or "json".
+    FileLevel      interface{}    // Log level for file output: can be string or int.
+    ConsoleLevel   interface{}    // Log level for console output: can be string or int.
+    ConsoleOutput  bool           // Whether to output logs to the console.
+    EnableRotation bool           // Whether to enable log rotation.
+    RotationConfig RotationConfig // Settings for log rotation.
+}
+```
+**Parameters**
+
+1. **FilePath** (Optional)
+    - **Type**: `string`
+    - **Description**: The full path to the log file where log messages will be stored. If left empty, logging to a file will be disabled.
+    - **Example**: `./logs/app.log`
+
+2. **Format** (Optional)
+    - **Type**: `string`
+    - **Description**: Specifies the format of the log output. Can be `"standard"` for a human-readable format or `"json"` for structured logging.
+    - **Default**: `"standard"`
+    - **Example**: `"json"`
+
+3. **FileLevel** (Optional)
+    - **Type**: interface{} (can be `string` or `int`)
+    - **Description**: Sets the minimum log level for messages that are written to the log file. Accepts either a string (e.g., `"info"`) or an integer (e.g., `2`). Refer to the Logging Levels section for valid values.
+    - **Default**: `"warning"`
+    - **Example**: `"debug"` or `1`
+
+4. **ConsoleLevel** (Optional)
+    - **Type**: interface{} (can be `string` or `int`)
+    - **Description**: Sets the minimum log level for messages that are displayed in the console. Accepts either a string or integer format. If not specified, defaults to `"warning"`.
+    - **Default**: `"warning"`
+    - **Example**: `0` (trace level) or `"info"`
+
+5. **ConsoleOutput** (Optional)
+    - **Type**: `bool`
+    - **Description**: Determines if log messages should also be output to the console.
+    - **Default**: `false`
+    - **Example**: `true`
+
+6. **EnableRotation** (Optional)
+    - **Type**: `bool`
+    - **Description**: Enables log rotation to manage the size of log files and keep them within specified limits.
+    - **Default**: `false`
+    - **Example**: `true`
+
+7. **RotationConfig** (Optional, used only if EnableRotation is true)
+    - **Type**: `RotationConfig`
+    - **Description**: Contains settings for log rotation, such as maximum size, number of backups, retention days, and compression.
+    - **Default**: Uses the default values within `RotationConfig`.
+
+## Log Levels
+You can specify log levels either as strings or integers:
+
+- As strings: `"trace"`, `"debug"`, `"info"`, `"warning"`, `"error"`, `"fatal"`
+- As integers:
+
+- `0`: `trace`
+- `1`: `debug`
+- `2`: `info`
+- `3`: `warning`
+- `4`: `error`
+- `5`: `fatal`
+For example:
+```go
+config := logger.LogConfig{
+    FileLevel:    "info", // Using string
+    ConsoleLevel: 1,      // Using integer
+}
+```
 
 ## Log Rotation
-The logger supports log file rotation, which allows you to control the size and number of logs, as well as automatically delete outdated files. Rotation is configured through the RotationConfig structure in the configuration.
+The logger supports log file rotation to manage log file sizes and retention.
 
 ### Rotation Parameters:
+The `RotationConfig` structure controls how log rotation is handled when `EnableRotation` is set to `true`.
+```go
+type RotationConfig struct {
+    MaxSize    int  // Maximum size in megabytes before log rotation.
+    MaxBackups int  // Maximum number of old log files to retain.
+    MaxAge     int  // Maximum number of days to retain old log files.
+    Compress   bool // Whether to compress rotated log files.
+}
+```
 
-- `MaxSize`: Maximum log file size in megabytes before rotation occurs.
-- `MaxBackups`: Maximum number of backup log files to keep.
-- `MaxAge`: Maximum number of days to keep old logs.
-- `Compress`: Compress archives on rotation (true/false).
+1. **MaxSize** (Optional)
+    - **Type**: `int`
+    - **Description**: Sets the maximum size (in megabytes) that a log file can reach before it is rotated.
+    - **Default**: `10` MB
+    - **Example**: `50`
 
-## Logging Levels
+2. **MaxBackups** (Optional)
+    - **Type**: `int`
+    - **Description**: The maximum number of backup log files to keep. When the limit is reached, the oldest log file will be deleted.
+    - **Default**: `7`
+    - **Example**: `5`
 
-- `trace`: Detailed information for debugging.
-- `debug`: Debug messages.
-- `info`: Informational messages about the normal operation of the application.
-- `warning`: Warnings about potential issues.
-- `error`: Errors that require attention.
-- `fatal`: Critical errors after which the application may terminate.
+3. **MaxAge** (Optional)
+    - **Type**: `int`
+    - **Description**: Maximum number of days to keep old log files. After this period, old files are deleted.
+    - **Default**: `30` days
+    - **xample**: `15`
+
+4. **Compress** (Optional)
+    - **Type**: `bool`
+    - **Description**: Enables compression for rotated log files, which helps reduce disk space usage.
+    - **Default**: `false`
+    - **Example**: `true`
 
 ## Logging Formats
 The logger supports two output formats:

@@ -1,36 +1,31 @@
 package logger_test
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
+    "bytes"
+    "fmt"
+    "io"
+    "os"
+    "path/filepath"
+    "strings"
+    "testing"
+    "time"
 
-	"github.com/nir0k/logger"
+    "github.com/nir0k/logger"
 )
 
 func TestConsoleOutput(t *testing.T) {
-    // Create a buffer to capture console output
+    // Проверяем логирование только в консоль, без записи в файл.
     var consoleOutput bytes.Buffer
-
-    // Save the original os.Stdout
     originalStdout := os.Stdout
-
-    // Create a pipe to redirect stdout
     r, w, _ := os.Pipe()
     os.Stdout = w
 
     config := logger.LogConfig{
-        Directory:      "./test_logs_console",
-        Format:         "standard",
-        FileLevel:      "debug",
-        ConsoleLevel:   "info",
-        ConsoleOutput:  true,
-        EnableRotation: false,
+        FilePath:      "", // Не указан путь к файлу
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
     }
 
     log, err := logger.NewLogger(config)
@@ -38,50 +33,39 @@ func TestConsoleOutput(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Start a goroutine to read from the pipe
     done := make(chan bool)
     go func() {
         io.Copy(&consoleOutput, r)
         done <- true
     }()
 
-    // Log a test message
+    // Логируем сообщение и проверяем, что оно появится в консоли
     log.Info("Test informational message")
 
-    // Close the writer to finish the goroutine
+    // Завершаем запись в консоль
     w.Close()
     <-done
-
-    // Restore the original os.Stdout
     os.Stdout = originalStdout
 
-    // Check the console output for the test message
+    // Проверяем вывод в консоль
     output := consoleOutput.String()
     if !strings.Contains(output, "Test informational message") {
         t.Errorf("Message not found in console output")
     }
-
-    // Remove the test log directory
-    os.RemoveAll("./test_logs_console")
 }
 
-func TestFileOutput(t *testing.T) {
-    // Create a temporary directory for logs
-    logDir, err := os.MkdirTemp("", "test_logs_file")
-    if err != nil {
-        t.Fatalf("Failed to create temporary directory: %v", err)
-    }
-    defer os.RemoveAll(logDir) // Clean up after the test
 
-    logFile := filepath.Join(logDir, "log.txt")
+func TestFileOutput(t *testing.T) {
+    // Проверяем логирование только в файл без вывода в консоль.
+    logFile := filepath.Join(os.TempDir(), "log.txt")
+    defer os.Remove(logFile)
 
     config := logger.LogConfig{
-        Directory:      logDir,
-        Format:         "standard",
-        FileLevel:      "debug",
-        ConsoleLevel:   "info",
-        ConsoleOutput:  false,
-        EnableRotation: false,
+        FilePath:      logFile, // Указан путь к файлу
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "info",
+        ConsoleOutput: false,
     }
 
     log, err := logger.NewLogger(config)
@@ -89,11 +73,11 @@ func TestFileOutput(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Log a test message
+    // Логируем сообщение и проверяем, что оно записывается в файл
     log.Info("Test informational message to file")
 
-    // Read the contents of the log file
-	data, err := os.ReadFile(logFile)
+    // Считываем содержимое файла и проверяем наличие сообщения
+    data, err := os.ReadFile(logFile)
     if err != nil {
         t.Fatalf("Failed to read log file: %v", err)
     }
@@ -104,22 +88,98 @@ func TestFileOutput(t *testing.T) {
     }
 }
 
-func TestLogRotation(t *testing.T) {
-    // Create a temporary directory for logs
-    logDir, err := os.MkdirTemp("", "test_logs_rotation")
-    if err != nil {
-        t.Fatalf("Failed to create temporary directory: %v", err)
+func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
+    // Проверяем, что лог-файл не создается, если путь к файлу не задан.
+    config := logger.LogConfig{
+        FilePath:      "", // Путь к файлу не указан
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "info",
+        ConsoleOutput: false,
     }
-    defer os.RemoveAll(logDir) // Clean up after the test
 
-    logFileName := "log.txt"
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    tempFile := filepath.Join(os.TempDir(), "unused_log.txt")
+    defer os.Remove(tempFile)
+
+    // Логируем сообщение, проверяем, что файл не создается
+    log.Info("This message should not appear in any file")
+
+    _, err = os.Stat(tempFile)
+    if !os.IsNotExist(err) {
+        t.Errorf("Log file should not be created when FilePath is not set")
+    }
+}
+
+
+func TestLogRotationWithCompression(t *testing.T) {
+    // Проверяем, что лог-файлы корректно ротируются и сжимаются.
+    logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
+    defer os.RemoveAll(filepath.Dir(logFile))
 
     config := logger.LogConfig{
-        Directory:      logDir,
-        Format:         "standard",
-        FileLevel:      "debug",
-        ConsoleLevel:   "info",
-        ConsoleOutput:  false,
+        FilePath:      logFile,
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "info",
+        ConsoleOutput: false,
+        EnableRotation: true,
+        RotationConfig: logger.RotationConfig{
+            MaxSize:    1,  // 1 MB
+            MaxBackups: 2,
+            MaxAge:     1,  // 1 day
+            Compress:   true,
+        },
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Пишем достаточное количество сообщений для проверки ротации и сжатия
+    smallMessage := strings.Repeat("A", 1024*10) // 10 KB
+    for i := 0; i < 110; i++ {
+        log.Info("Message number", i, smallMessage)
+    }
+
+    // Ждем, чтобы ротация произошла
+    time.Sleep(2 * time.Second)
+
+    // Проверяем, что ротация и сжатие файлов произошли
+    files, err := os.ReadDir(filepath.Dir(logFile))
+    if err != nil {
+        t.Fatalf("Failed to read log directory: %v", err)
+    }
+
+    compressedFiles := 0
+    for _, file := range files {
+        if strings.HasSuffix(file.Name(), ".gz") {
+            compressedFiles++
+        }
+    }
+
+    if compressedFiles == 0 {
+        t.Errorf("No compressed files found")
+    }
+}
+
+
+func TestLogRotationWithoutCompression(t *testing.T) {
+    // Проверяем ротацию логов без сжатия.
+    logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
+    defer os.RemoveAll(filepath.Dir(logFile))
+
+    config := logger.LogConfig{
+        FilePath:      logFile,
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "info",
+        ConsoleOutput: false,
         EnableRotation: true,
         RotationConfig: logger.RotationConfig{
             MaxSize:    1, // 1 MB
@@ -134,109 +194,45 @@ func TestLogRotation(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Write multiple small messages to exceed MaxSize
+    // Пишем достаточное количество сообщений для ротации логов
     smallMessage := strings.Repeat("A", 1024*10) // 10 KB
-    messagesToWrite := 110                       // 110 * 10 KB = 1.1 MB
-
-    for i := 0; i < messagesToWrite; i++ {
+    for i := 0; i < 110; i++ {                   // 110 * 10 KB = 1.1 MB
         log.Info("Message number", i, smallMessage)
     }
 
-    // Wait for rotation to occur
+    // Ждем, чтобы ротация произошла
     time.Sleep(1 * time.Second)
 
-    // Check for rotated log files
-    files, err := os.ReadDir(logDir)
+    // Проверяем количество лог-файлов после ротации
+    files, err := os.ReadDir(filepath.Dir(logFile))
     if err != nil {
         t.Fatalf("Failed to read log directory: %v", err)
     }
 
-    // Count the number of log files
     logFiles := 0
     for _, file := range files {
-        if file.Name() == logFileName || strings.HasPrefix(file.Name(), strings.TrimSuffix(logFileName, ".txt")) {
+        if file.Name() == filepath.Base(logFile) || strings.HasPrefix(file.Name(), strings.TrimSuffix(filepath.Base(logFile), ".txt")) {
             logFiles++
-            t.Logf("Found file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
+            t.Logf("Found file: %s", file.Name())
         }
     }
 
     if logFiles < 2 {
-        t.Errorf("Log rotation did not occur, found files: %d", logFiles)
-    }
-}
-
-func TestLogRotationWithCompression(t *testing.T) {
-    // Create a temporary directory for logs
-    logDir, err := os.MkdirTemp("", "test_logs_rotation_compress")
-    if err != nil {
-        t.Fatalf("Failed to create temporary directory: %v", err)
-    }
-    defer os.RemoveAll(logDir) // Clean up after the test
-
-    config := logger.LogConfig{
-        Directory:      logDir,
-        Format:         "standard",
-        FileLevel:      "debug",
-        ConsoleLevel:   "info",
-        ConsoleOutput:  false,
-        EnableRotation: true,
-        RotationConfig: logger.RotationConfig{
-            MaxSize:    1,  // 1 MB
-            MaxBackups: 2,
-            MaxAge:     1,  // 1 day
-            Compress:   true, // Enable compression
-        },
-    }
-
-    log, err := logger.NewLogger(config)
-    if err != nil {
-        t.Fatalf("Failed to create logger: %v", err)
-    }
-
-    // Write multiple small messages to exceed MaxSize
-    smallMessage := strings.Repeat("A", 1024*10) // 10 KB
-    messagesToWrite := 110                       // 110 * 10 KB = 1.1 MB
-
-    for i := 0; i < messagesToWrite; i++ {
-        log.Info("Message number", i, smallMessage)
-    }
-
-    // Wait for rotation and compression to occur
-    time.Sleep(2 * time.Second)
-
-    // Check for compressed log files
-    files, err := os.ReadDir(logDir)
-    if err != nil {
-        t.Fatalf("Failed to read log directory: %v", err)
-    }
-
-    compressedFiles := 0
-    for _, file := range files {
-        if strings.HasSuffix(file.Name(), ".gz") {
-            compressedFiles++
-            t.Logf("Found compressed file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
-        } else {
-            t.Logf("Found file: %s (size: %d bytes)", file.Name(), fileInfoSize(logDir, file.Name()))
-        }
-    }
-
-    if compressedFiles == 0 {
-        t.Errorf("No compressed files found")
-    } else {
-        t.Logf("Number of compressed files: %d", compressedFiles)
+        t.Errorf("Log rotation did not occur as expected, found %d files", logFiles)
     }
 }
 
 // fileInfoSize returns the size of a file in bytes.
-func fileInfoSize(dir, name string) int64 {
-    info, err := os.Stat(filepath.Join(dir, name))
-    if err != nil {
-        return 0
-    }
-    return info.Size()
-}
+// func fileInfoSize(dir, name string) int64 {
+//     info, err := os.Stat(filepath.Join(dir, name))
+//     if err != nil {
+//         return 0
+//     }
+//     return info.Size()
+// }
 
 func TestDefaultConfig(t *testing.T) {
+    // Проверяем подстановку значений по умолчанию при создании логгера.
     config := logger.LogConfig{}
 
     log, err := logger.NewLogger(config)
@@ -245,20 +241,20 @@ func TestDefaultConfig(t *testing.T) {
     }
 
     // Проверяем значения по умолчанию
-    if log.Config.Directory != "./logs" {
-        t.Errorf("Expected default Directory to be './logs', got '%s'", log.Config.Directory)
+    if log.Config.FilePath != "" {
+        t.Errorf("Expected default FilePath to be empty, got '%s'", log.Config.FilePath)
     }
     if log.Config.Format != "standard" {
         t.Errorf("Expected default Format to be 'standard', got '%s'", log.Config.Format)
     }
-    if log.Config.FileLevel != "info" {
-        t.Errorf("Expected default FileLevel to be 'info', got '%s'", log.Config.FileLevel)
+    if log.Config.FileLevel != "warning" {
+        t.Errorf("Expected default FileLevel to be 'warning', got '%s'", log.Config.FileLevel)
     }
-    if log.Config.ConsoleLevel != "info" {
-        t.Errorf("Expected default ConsoleLevel to be 'info', got '%s'", log.Config.ConsoleLevel)
+    if log.Config.ConsoleLevel != "warning" {
+        t.Errorf("Expected default ConsoleLevel to be 'warning', got '%s'", log.Config.ConsoleLevel)
     }
     if log.Config.RotationConfig.MaxSize != 10 {
-        t.Errorf("Expected default RotationConfig.MaxSize to be 100, got %d", log.Config.RotationConfig.MaxSize)
+        t.Errorf("Expected default RotationConfig.MaxSize to be 10, got %d", log.Config.RotationConfig.MaxSize)
     }
     if log.Config.RotationConfig.MaxBackups != 7 {
         t.Errorf("Expected default RotationConfig.MaxBackups to be 7, got %d", log.Config.RotationConfig.MaxBackups)
@@ -268,24 +264,24 @@ func TestDefaultConfig(t *testing.T) {
     }
 }
 
+
 func TestLogMethods(t *testing.T) {
-    // Создаём буфер для захвата вывода в консоль
+    // Проверяем, что методы логирования работают корректно и выводятся в консоль.
     var consoleOutput bytes.Buffer
 
-    // Сохраняем оригинальный os.Stdout
+    // Сохраняем оригинальный os.Stdout для восстановления позже
     originalStdout := os.Stdout
 
-    // Создаём пайп для перенаправления stdout
+    // Создаем пайп для перенаправления stdout
     r, w, _ := os.Pipe()
     os.Stdout = w
 
     config := logger.LogConfig{
-        Directory:      "./test_logs_methods",
-        Format:         "standard",
-        FileLevel:      "trace",
-        ConsoleLevel:   "trace",
-        ConsoleOutput:  true,
-        EnableRotation: false,
+        FilePath:      "", // Путь к файлу не указан, логирование будет только в консоль
+        Format:        "standard",
+        FileLevel:     "trace",
+        ConsoleLevel:  "trace",
+        ConsoleOutput: true,
     }
 
     log, err := logger.NewLogger(config)
@@ -300,7 +296,7 @@ func TestLogMethods(t *testing.T) {
         done <- true
     }()
 
-    // Логируем тестовые сообщения
+    // Логируем сообщения для проверки всех методов логирования
     log.Trace("TRACE level message")
     log.Debug("Debug message")
     log.Info("Informational message")
@@ -374,7 +370,218 @@ func TestLogMethods(t *testing.T) {
             t.Errorf("Expected '%s' in output, got '%s'", msg, output)
         }
     }
+}
 
-    // Удаляем тестовую директорию логов
-    os.RemoveAll("./test_logs_methods")
+func TestLogToConsoleOnly(t *testing.T) {
+    // Проверяем, что логирование происходит только в консоль и не записывается в файл.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    config := logger.LogConfig{
+        FilePath:      "", // Путь к файлу не указан
+        Format:        "standard",
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Логируем сообщение для проверки вывода в консоль
+    log.Info("Test message for console only")
+
+    // Завершаем запись в консоль
+    w.Close()
+    <-done
+    os.Stdout = originalStdout
+
+    // Проверяем, что сообщение присутствует в консоли
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Test message for console only") {
+        t.Errorf("Expected 'Test message for console only' in console output, got '%s'", output)
+    }
+}
+
+func TestLogToFileOnly(t *testing.T) {
+    // Проверяем, что логирование происходит только в файл и не выводится в консоль.
+    logFile := filepath.Join(os.TempDir(), "test_log_to_file_only.txt")
+    defer os.Remove(logFile)
+
+    config := logger.LogConfig{
+        FilePath:      logFile, // Указан путь к файлу
+        Format:        "standard",
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: false,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Логируем сообщение для проверки записи в файл
+    log.Info("Test message for file only")
+
+    // Считываем содержимое файла и проверяем наличие сообщения
+    data, err := os.ReadFile(logFile)
+    if err != nil {
+        t.Fatalf("Failed to read log file: %v", err)
+    }
+
+    content := string(data)
+    if !strings.Contains(content, "Test message for file only") {
+        t.Errorf("Expected 'Test message for file only' in file output")
+    }
+}
+
+func TestLogToFileAndConsole(t *testing.T) {
+    // Проверяем, что логирование происходит одновременно в файл и в консоль.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    logFile := filepath.Join(os.TempDir(), "test_log_to_file_and_console.txt")
+    defer os.Remove(logFile)
+
+    config := logger.LogConfig{
+        FilePath:      logFile, // Указан путь к файлу
+        Format:        "standard",
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Логируем сообщение для проверки вывода в файл и консоль
+    log.Info("Test message for file and console")
+
+    // Завершаем запись в консоль
+    w.Close()
+    <-done
+    os.Stdout = originalStdout
+
+    // Проверяем наличие сообщения в консоли
+    consoleOutputStr := consoleOutput.String()
+    if !strings.Contains(consoleOutputStr, "Test message for file and console") {
+        t.Errorf("Expected 'Test message for file and console' in console output")
+    }
+
+    // Проверяем наличие сообщения в файле
+    fileOutput, err := os.ReadFile(logFile)
+    if err != nil {
+        t.Fatalf("Failed to read log file: %v", err)
+    }
+
+    if !strings.Contains(string(fileOutput), "Test message for file and console") {
+        t.Errorf("Expected 'Test message for file and console' in file output")
+    }
+}
+
+func TestLogInJsonFormat(t *testing.T) {
+    // Проверяем, что логирование происходит в формате JSON.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    logFile := filepath.Join(os.TempDir(), "test_log_json_format.txt")
+    defer os.Remove(logFile)
+
+    config := logger.LogConfig{
+        FilePath:      logFile, // Указан путь к файлу
+        Format:        "json",  // Указан формат JSON
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Логируем сообщение для проверки JSON-вывода
+    log.Info("Test message in JSON format")
+
+    // Завершаем запись в консоль
+    w.Close()
+    <-done
+    os.Stdout = originalStdout
+
+    // Проверяем наличие сообщения в формате JSON в консоли
+    consoleOutputStr := consoleOutput.String()
+    if !strings.Contains(consoleOutputStr, `"message":"Test message in JSON format"`) {
+        t.Errorf("Expected JSON formatted 'Test message in JSON format' in console output")
+    }
+
+    // Проверяем наличие сообщения в формате JSON в файле
+    fileOutput, err := os.ReadFile(logFile)
+    if err != nil {
+        t.Fatalf("Failed to read log file: %v", err)
+    }
+
+    if !strings.Contains(string(fileOutput), `"message":"Test message in JSON format"`) {
+        t.Errorf("Expected JSON formatted 'Test message in JSON format' in file output")
+    }
+}
+
+func TestDefaultValues(t *testing.T) {
+    // Проверяем, что при частичном задании конфигурации корректно подставляются значения по умолчанию.
+    config := logger.LogConfig{
+        FilePath: "", // Путь к файлу не указан
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    // Проверяем значения по умолчанию
+    if log.Config.Format != "standard" {
+        t.Errorf("Expected default Format to be 'standard', got '%s'", log.Config.Format)
+    }
+    if log.Config.FileLevel != "warning" {
+        t.Errorf("Expected default FileLevel to be 'warning', got '%s'", log.Config.FileLevel)
+    }
+    if log.Config.ConsoleLevel != "warning" {
+        t.Errorf("Expected default ConsoleLevel to be 'warning', got '%s'", log.Config.ConsoleLevel)
+    }
+    if log.Config.RotationConfig.MaxSize != 10 {
+        t.Errorf("Expected default RotationConfig.MaxSize to be 10, got %d", log.Config.RotationConfig.MaxSize)
+    }
+    if log.Config.RotationConfig.MaxBackups != 7 {
+        t.Errorf("Expected default RotationConfig.MaxBackups to be 7, got %d", log.Config.RotationConfig.MaxBackups)
+    }
+    if log.Config.RotationConfig.MaxAge != 30 {
+        t.Errorf("Expected default RotationConfig.MaxAge to be 30, got %d", log.Config.RotationConfig.MaxAge)
+    }
 }

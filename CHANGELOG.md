@@ -2,6 +2,18 @@
 
 All significant changes to this project will be documented in this file.
 
+## [1.2.3] - 2024-11-11
+
+### Added
+
+- Added validation for `FileLevel` and `ConsoleLevel` configuration fields to support both string and numeric values for log levels.
+- Enhanced error handling in `NewLogger` to verify that numeric log levels are within the valid range (0 to 5).
+- Console output for error messages if logger initialization fails, aiding in diagnosing configuration issues.
+
+### Changed
+
+- Improved the default configuration application to ensure `FileLevel` and `ConsoleLevel` are assigned valid values.
+
 ## [1.2.2] - 2024-11-11
 
 ### Changed
