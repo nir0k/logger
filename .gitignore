@@ -1,38 +1,38 @@
-# Скомпилированные бинарные файлы
+# Compiled binary files
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Тестовые бинарные файлы, созданные с помощью `go test -c`
+# Test binary files created with `go test -c`
 *.test
 
-# Вывод инструмента покрытия кода
+# Code coverage tool output
 *.out
 
-# Файлы зависимостей
+# Dependency files
 vendor/
 
-# Файлы модуля Go
+# Go module files
 go.sum
 
-# Файлы рабочей области Go
+# Go workspace files
 go.work
 go.work.sum
 
-# Резервные файлы редактора
+# Backup editor files
 *~
 
-# Файлы и каталоги IDE/редакторов
+# IDE/Editor files and directories
 .idea/
 .vscode/
 *.swp
 
-# Файлы macOS
+# macOS files
 .DS_Store
 
-# Логи и временные файлы
+# Logs and temporary files
 *.log
 *.tmp
 logs/
