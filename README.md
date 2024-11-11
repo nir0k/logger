@@ -67,6 +67,8 @@ func main() {
     // log.Fatalln("Critical error, application will terminate with newline")
 }
 ```
+Note: The `log.Fatal` lines are commented out because they will terminate the application immediately after logging the message.
+
 
 ## Log Rotation
 The logger supports log file rotation, which allows you to control the size and number of logs, as well as automatically delete outdated files. Rotation is configured through the RotationConfig structure in the configuration.

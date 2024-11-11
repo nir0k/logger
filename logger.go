@@ -3,19 +3,29 @@
 package logger
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"time"
+    "encoding/json"
+    "fmt"
+    "io"
+    "log"
+    "os"
+    "path/filepath"
+    "runtime"
+    "strings"
+    "time"
 
-	"github.com/fatih/color"
-	"github.com/natefinch/lumberjack"
+    "github.com/fatih/color"
+    "github.com/natefinch/lumberjack"
 )
+
+// Global variable for the logger instance
+var logInstance *Logger
+
+// InitLogger initializes the logger and saves the instance in logInstance
+func InitLogger(config LogConfig) error {
+    var err error
+    logInstance, err = NewLogger(config)
+    return err
+}
 
 // LogConfig represents the configuration settings for the Logger.
 type LogConfig struct {
@@ -61,7 +71,7 @@ func setDefaults(config *LogConfig) {
         config.ConsoleLevel = "info"
     }
     if config.RotationConfig.MaxSize == 0 {
-        config.RotationConfig.MaxSize = 10 // 100 MB
+        config.RotationConfig.MaxSize = 10 // 10 MB
     }
     if config.RotationConfig.MaxBackups == 0 {
         config.RotationConfig.MaxBackups = 7 // 7 backups
@@ -72,24 +82,8 @@ func setDefaults(config *LogConfig) {
 }
 
 // NewLogger creates a new Logger instance with the specified configuration.
-// It initializes loggers for file output and console output based on the configuration.
 //
 // Returns an error if the log level is invalid or if there is an issue creating the log directory or files.
-// NewLogger creates a new Logger instance based on the provided LogConfig.
-// It sets up the log level, checks and creates the log directory if it does not exist,
-// and configures file and console outputs for logging.
-//
-// Parameters:
-//   - config: LogConfig struct containing the configuration for the logger.
-//
-// Returns:
-//   - *Logger: A pointer to the created Logger instance.
-//   - error: An error if the logger could not be created, otherwise nil.
-//
-// Possible errors:
-//   - If the log level specified in the config is invalid.
-//   - If the log directory could not be created.
-//   - If the log file could not be opened.
 func NewLogger(config LogConfig) (*Logger, error) {
     // Устанавливаем значения по умолчанию
     setDefaults(&config)
@@ -173,7 +167,7 @@ func (l *Logger) log(level string, v ...interface{}) {
     pid := os.Getpid()
 
     // Get the caller information
-    _, file, line, ok := runtime.Caller(2)
+    _, file, line, ok := runtime.Caller(3)
     if !ok {
         file = "unknown"
         line = 0
@@ -258,25 +252,135 @@ func findProjectDir() string {
     return ""
 }
 
-// colorize applies color to the log message based on the log level.
-func (l *Logger) colorize(level string, message string) string {
-    switch strings.ToLower(level) {
-    case "trace":
-        return color.HiBlueString(message) // Light blue
-    case "debug":
-        return color.HiCyanString(message) // Light cyan
-    case "info":
-        return color.HiGreenString(message) // Light green
-    case "warning":
-        return color.HiYellowString(message) // Light yellow
-    case "error":
-        return color.HiRedString(message) // Light red
-    case "fatal":
-        return color.New(color.FgWhite, color.BgHiRed).Sprint(message) // White text on bright red background
-    default:
-        return message
+// Пакетные функции-обёртки для методов логгера
+
+// Trace logs a message at the TRACE level.
+func Trace(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Trace(v...)
     }
 }
+
+// Debug logs a message at the DEBUG level.
+func Debug(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Debug(v...)
+    }
+}
+
+// Info logs a message at the INFO level.
+func Info(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Info(v...)
+    }
+}
+
+// Warning logs a message at the WARNING level.
+func Warning(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Warning(v...)
+    }
+}
+
+// Error logs a message at the ERROR level.
+func Error(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Error(v...)
+    }
+}
+
+// Fatal logs a message at the FATAL level and exits the application.
+func Fatal(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Fatal(v...)
+    }
+}
+
+// Tracef logs a formatted message at the TRACE level.
+func Tracef(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Tracef(format, v...)
+    }
+}
+
+// Debugf logs a formatted message at the DEBUG level.
+func Debugf(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Debugf(format, v...)
+    }
+}
+
+// Infof logs a formatted message at the INFO level.
+func Infof(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Infof(format, v...)
+    }
+}
+
+// Warningf logs a formatted message at the WARNING level.
+func Warningf(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Warningf(format, v...)
+    }
+}
+
+// Errorf logs a formatted message at the ERROR level.
+func Errorf(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Errorf(format, v...)
+    }
+}
+
+// Fatalf logs a formatted message at the FATAL level and exits the application.
+func Fatalf(format string, v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Fatalf(format, v...)
+    }
+}
+
+// Traceln logs a message at the TRACE level with a newline.
+func Traceln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Traceln(v...)
+    }
+}
+
+// Debugln logs a message at the DEBUG level with a newline.
+func Debugln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Debugln(v...)
+    }
+}
+
+// Infoln logs a message at the INFO level with a newline.
+func Infoln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Infoln(v...)
+    }
+}
+
+// Warningln logs a message at the WARNING level with a newline.
+func Warningln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Warningln(v...)
+    }
+}
+
+// Errorln logs a message at the ERROR level with a newline.
+func Errorln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Errorln(v...)
+    }
+}
+
+// Fatalln logs a message at the FATAL level with a newline and exits the application.
+func Fatalln(v ...interface{}) {
+    if logInstance != nil {
+        logInstance.Fatalln(v...)
+    }
+}
+
+// Методы экземпляра логгера
 
 // Trace logs a message at the TRACE level.
 func (l *Logger) Trace(v ...interface{}) {

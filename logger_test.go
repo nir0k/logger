@@ -1,15 +1,16 @@
 package logger_test
 
 import (
-    "bytes"
-    "io"
-    "os"
-    "path/filepath"
-    "strings"
-    "testing"
-    "time"
+	"bytes"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
 
-    "github.com/nir0k/logger"
+	"github.com/nir0k/logger"
 )
 
 func TestConsoleOutput(t *testing.T) {
@@ -268,13 +269,13 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestLogMethods(t *testing.T) {
-    // Create a buffer to capture console output
+    // Создаём буфер для захвата вывода в консоль
     var consoleOutput bytes.Buffer
 
-    // Save the original os.Stdout
+    // Сохраняем оригинальный os.Stdout
     originalStdout := os.Stdout
 
-    // Create a pipe to redirect stdout
+    // Создаём пайп для перенаправления stdout
     r, w, _ := os.Pipe()
     os.Stdout = w
 
@@ -292,83 +293,88 @@ func TestLogMethods(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Start a goroutine to read from the pipe
+    // Запускаем горутину для чтения из пайпа
     done := make(chan bool)
     go func() {
         io.Copy(&consoleOutput, r)
         done <- true
     }()
 
-    // Log test messages
+    // Логируем тестовые сообщения
     log.Trace("TRACE level message")
     log.Debug("Debug message")
     log.Info("Informational message")
     log.Warning("Warning")
     log.Error("Error message")
-    // log.Fatal("Critical error, application will terminate")
 
     log.Tracef("TRACE level message: %d", 1)
     log.Debugf("Debug message: %d", 2)
     log.Infof("Informational message: %d", 3)
     log.Warningf("Warning message: %d", 4)
     log.Errorf("Error message: %d", 5)
-    // log.Fatalf("Critical error, application will terminate: %d", 6)
 
     log.Traceln("TRACE level message with newline")
     log.Debugln("Debug message with newline")
     log.Infoln("Informational message with newline")
     log.Warningln("Warning message with newline")
     log.Errorln("Error message with newline")
-    // log.Fatalln("Critical error, application will terminate with newline")
 
-    // Close the writer to finish the goroutine
+    // Закрываем writer для завершения горутины
     w.Close()
     <-done
 
-    // Restore the original os.Stdout
+    // Восстанавливаем оригинальный os.Stdout
     os.Stdout = originalStdout
 
-    // Check the console output for the test messages
+    // Проверяем вывод в консоль
     output := consoleOutput.String()
     lines := strings.Split(output, "\n")
 
-    for i, line := range lines {
-        if i > 0 && line != "" && !strings.HasPrefix(line, "[") {
-            t.Errorf("Expected new log entry to start with '[', got '%s'", line)
+    pidStr := fmt.Sprintf("PID: %d", os.Getpid())
+
+    for _, line := range lines {
+        if line == "" {
+            continue
+        }
+        // Проверяем, что строка начинается с '['
+        if !strings.HasPrefix(line, "[") {
+            t.Errorf("Expected log entry to start with '[', got '%s'", line)
+        }
+        // Проверяем наличие PID
+        if !strings.Contains(line, pidStr) {
+            t.Errorf("Expected PID '%s' in log entry, got '%s'", pidStr, line)
+        }
+        // Проверяем наличие пути к файлу и номера строки
+        if !strings.Contains(line, ".go:") {
+            t.Errorf("Expected file path and line number in log entry, got '%s'", line)
         }
     }
 
-    if !strings.Contains(output, "TRACE level message: 1") {
-        t.Errorf("Expected 'TRACE level message: 1' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Debug message: 2") {
-        t.Errorf("Expected 'Debug message: 2' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Informational message: 3") {
-        t.Errorf("Expected 'Informational message: 3' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Warning message: 4") {
-        t.Errorf("Expected 'Warning message: 4' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Error message: 5") {
-        t.Errorf("Expected 'Error message: 5' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "TRACE level message with newline") {
-        t.Errorf("Expected 'TRACE level message with newline' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Debug message with newline") {
-        t.Errorf("Expected 'Debug message with newline' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Informational message with newline") {
-        t.Errorf("Expected 'Informational message with newline' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Warning message with newline") {
-        t.Errorf("Expected 'Warning message with newline' in output, got '%s'", output)
-    }
-    if !strings.Contains(output, "Error message with newline") {
-        t.Errorf("Expected 'Error message with newline' in output, got '%s'", output)
+    // Проверяем наличие ожидаемых сообщений
+    expectedMessages := []string{
+        "TRACE level message",
+        "Debug message",
+        "Informational message",
+        "Warning",
+        "Error message",
+        "TRACE level message: 1",
+        "Debug message: 2",
+        "Informational message: 3",
+        "Warning message: 4",
+        "Error message: 5",
+        "TRACE level message with newline",
+        "Debug message with newline",
+        "Informational message with newline",
+        "Warning message with newline",
+        "Error message with newline",
     }
 
-    // Remove the test log directory
+    for _, msg := range expectedMessages {
+        if !strings.Contains(output, msg) {
+            t.Errorf("Expected '%s' in output, got '%s'", msg, output)
+        }
+    }
+
+    // Удаляем тестовую директорию логов
     os.RemoveAll("./test_logs_methods")
 }

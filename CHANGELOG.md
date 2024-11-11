@@ -2,6 +2,17 @@
 
 All significant changes to this project will be documented in this file.
 
+## [1.2.2] - 2024-11-11
+
+### Changed
+
+- Updated logger initialization to store the logger instance and configuration globally.
+
+### Added
+
+- Added a global variable for the logger instance.
+- Added a function to initialize the logger and save the instance in the global variable.
+
 ## [1.2.1] - 2024-11-10
 
 ### Added
