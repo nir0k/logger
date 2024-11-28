@@ -48,30 +48,37 @@ func main() {
         panic(err)
     }
 
-    // Use the logger
-    logger.Trace("TRACE level message")
-    logger.Debug("Debug message")
-    logger.Info("Informational message")
+    // Using the logger
+    logger.Print("Message level PRINT")
+    logger.Trace("Message level TRACE")
+    logger.Debug("Message level Debug")
+    logger.Info("Information message")
     logger.Warning("Warning")
     logger.Error("Error message")
-    // logger.Fatal("Critical error, application will terminate")
-
-    logger.Tracef("TRACE level message: %d", 1)
-    logger.Debugf("Debug message: %d", 2)
-    logger.Infof("Informational message: %d", 3)
-    logger.Warningf("Warning message: %d", 4)
+    // logger.Fatal("Critical error, the application will terminate")
+    
+    logger.Printf("Message level PRINT: %d", 1)
+    logger.Tracef("Message level TRACE: %d", 1)
+    logger.Debugf("Message level Debug: %d", 2)
+    logger.Infof("Information message: %d", 3)
+    logger.Warningf("Warning: %d", 4)
     logger.Errorf("Error message: %d", 5)
-    // logger.Fatalf("Critical error, application will terminate: %d", 6)
+    // logger.Fatalf("Critical error, the application will terminate: %d", 6)
 
-    logger.Traceln("TRACE level message with newline")
-    logger.Debugln("Debug message with newline")
-    logger.Infoln("Informational message with newline")
-    logger.Warningln("Warning message with newline")
-    logger.Errorln("Error message with newline")
-    // logger.Fatalln("Critical error, application will terminate with newline")
+    logger.Println("Message level PRINT with new line")
+    logger.Traceln("Message level TRACE with new line")
+    logger.Debugln("Message level Debug with new line")
+    logger.Infoln("Information message with new line")
+    logger.Warningln("Warning with new line")
+    logger.Errorln("Error message with new line")
+    // logger.Fatalln("Critical error, the application will terminate with new line")
 }
 
 ```
+<img src="images/Screenshot.png" alt="Screenshot"/> 
+
+
+
 **Note**: The `log.Fatal` lines are commented out because they will terminate the application immediately after logging the message.
 
 

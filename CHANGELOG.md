@@ -2,6 +2,18 @@
 
 All significant changes to this project will be documented in this file.
 
+## [1.4.0] - 2024-12-01
+
+### Added
+- Added `defaultConfig` function to get the default logger configuration.
+- Added `ensureLoggerInitialized` function to check and initialize the logger with default settings if it has not been initialized.
+- Updated tests to verify the operation of `ensureLoggerInitialized` and logging before explicit initialization.
+
+## [1.3.0] - 2024-11-25
+
+### Added
+- Added `Print`, `Printf`, and `Println` methods to the logger, which always log messages regardless of the logging level settings.
+
 ## [1.2.3] - 2024-11-11
 
 ### Added

@@ -14,7 +14,7 @@ import (
 )
 
 func TestConsoleOutput(t *testing.T) {
-    // Verify logging only to the console without writing to a file.
+    // Check logging only to console, without writing to file.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
     r, w, _ := os.Pipe()
@@ -39,23 +39,24 @@ func TestConsoleOutput(t *testing.T) {
         done <- true
     }()
 
-    // Log a message and verify that it appears in the console
+    // Log a message and check that it appears in the console
     log.Info("Test informational message")
 
-    // Finish writing to the console
+    // Finish writing to console
     w.Close()
     <-done
     os.Stdout = originalStdout
 
-    // Check the console output
+    // Check console output
     output := consoleOutput.String()
     if !strings.Contains(output, "Test informational message") {
         t.Errorf("Message not found in console output")
     }
 }
 
+
 func TestFileOutput(t *testing.T) {
-    // Verify logging only to a file without console output.
+    // Check logging only to file without console output.
     logFile := filepath.Join(os.TempDir(), "log.txt")
     defer os.Remove(logFile)
 
@@ -72,7 +73,7 @@ func TestFileOutput(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Log a message and verify that it is written to the file
+    // Log a message and check that it is written to the file
     log.Info("Test informational message to file")
 
     // Read the file content and check for the message
@@ -88,7 +89,7 @@ func TestFileOutput(t *testing.T) {
 }
 
 func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
-    // Verify that the log file is not created if the file path is not set.
+    // Check that log file is not created if file path is not set.
     config := logger.LogConfig{
         FilePath:      "", // File path not specified
         Format:        "standard",
@@ -105,7 +106,7 @@ func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
     tempFile := filepath.Join(os.TempDir(), "unused_log.txt")
     defer os.Remove(tempFile)
 
-    // Log a message and verify that the file is not created
+    // Log a message and check that the file is not created
     log.Info("This message should not appear in any file")
 
     _, err = os.Stat(tempFile)
@@ -114,8 +115,9 @@ func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
     }
 }
 
+
 func TestLogRotationWithCompression(t *testing.T) {
-    // Verify that log files are correctly rotated and compressed.
+    // Check that log files are correctly rotated and compressed.
     logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
     defer os.RemoveAll(filepath.Dir(logFile))
 
@@ -139,7 +141,7 @@ func TestLogRotationWithCompression(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Write enough messages to test rotation and compression
+    // Write enough messages to check rotation and compression
     smallMessage := strings.Repeat("A", 1024*10) // 10 KB
     for i := 0; i < 110; i++ {
         log.Info("Message number", i, smallMessage)
@@ -148,7 +150,7 @@ func TestLogRotationWithCompression(t *testing.T) {
     // Wait for rotation to occur
     time.Sleep(2 * time.Second)
 
-    // Verify that log files have been rotated and compressed
+    // Check that rotation and compression occurred
     files, err := os.ReadDir(filepath.Dir(logFile))
     if err != nil {
         t.Fatalf("Failed to read log directory: %v", err)
@@ -166,8 +168,9 @@ func TestLogRotationWithCompression(t *testing.T) {
     }
 }
 
+
 func TestLogRotationWithoutCompression(t *testing.T) {
-    // Verify log rotation without compression.
+    // Check log rotation without compression.
     logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
     defer os.RemoveAll(filepath.Dir(logFile))
 
@@ -191,7 +194,7 @@ func TestLogRotationWithoutCompression(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Write enough messages for log rotation
+    // Write enough messages to trigger log rotation
     smallMessage := strings.Repeat("A", 1024*10) // 10 KB
     for i := 0; i < 110; i++ {                   // 110 * 10 KB = 1.1 MB
         log.Info("Message number", i, smallMessage)
@@ -200,7 +203,7 @@ func TestLogRotationWithoutCompression(t *testing.T) {
     // Wait for rotation to occur
     time.Sleep(1 * time.Second)
 
-    // Verify the number of log files after rotation
+    // Check the number of log files after rotation
     files, err := os.ReadDir(filepath.Dir(logFile))
     if err != nil {
         t.Fatalf("Failed to read log directory: %v", err)
@@ -219,17 +222,8 @@ func TestLogRotationWithoutCompression(t *testing.T) {
     }
 }
 
-// fileInfoSize returns the size of a file in bytes.
-// func fileInfoSize(dir, name string) int64 {
-//     info, err := os.Stat(filepath.Join(dir, name))
-//     if err != nil {
-//         return 0
-//     }
-//     return info.Size()
-// }
-
 func TestDefaultConfig(t *testing.T) {
-    // Verify that default values are set when creating the logger.
+    // Check default values when creating logger.
     config := logger.LogConfig{}
 
     log, err := logger.NewLogger(config)
@@ -261,11 +255,12 @@ func TestDefaultConfig(t *testing.T) {
     }
 }
 
+
 func TestLogMethods(t *testing.T) {
-    // Verify that logging methods work correctly and output to the console.
+    // Check that logging methods work correctly and output to console.
     var consoleOutput bytes.Buffer
 
-    // Save the original os.Stdout for restoration later
+    // Save original os.Stdout to restore later
     originalStdout := os.Stdout
 
     // Create a pipe to redirect stdout
@@ -273,7 +268,7 @@ func TestLogMethods(t *testing.T) {
     os.Stdout = w
 
     config := logger.LogConfig{
-        FilePath:      "", // File path not specified, logging will be only to the console
+        FilePath:      "", // File path not specified, logging will be to console only
         Format:        "standard",
         FileLevel:     "trace",
         ConsoleLevel:  "trace",
@@ -292,7 +287,7 @@ func TestLogMethods(t *testing.T) {
         done <- true
     }()
 
-    // Log messages to test all logging methods
+    // Log messages to check all logging methods
     log.Trace("TRACE level message")
     log.Debug("Debug message")
     log.Info("Informational message")
@@ -315,10 +310,10 @@ func TestLogMethods(t *testing.T) {
     w.Close()
     <-done
 
-    // Restore the original os.Stdout
+    // Restore original os.Stdout
     os.Stdout = originalStdout
 
-    // Check the console output
+    // Check console output
     output := consoleOutput.String()
     lines := strings.Split(output, "\n")
 
@@ -332,7 +327,7 @@ func TestLogMethods(t *testing.T) {
         if !strings.HasPrefix(line, "[") {
             t.Errorf("Expected log entry to start with '[', got '%s'", line)
         }
-        // Check for PID presence
+        // Check for PID
         if !strings.Contains(line, pidStr) {
             t.Errorf("Expected PID '%s' in log entry, got '%s'", pidStr, line)
         }
@@ -369,7 +364,7 @@ func TestLogMethods(t *testing.T) {
 }
 
 func TestLogToConsoleOnly(t *testing.T) {
-    // Verify that logging occurs only to the console and is not written to a file.
+    // Check that logging occurs only to console and not to file.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
     r, w, _ := os.Pipe()
@@ -397,7 +392,7 @@ func TestLogToConsoleOnly(t *testing.T) {
     // Log a message to check console output
     log.Info("Test message for console only")
 
-    // Finish writing to the console
+    // Finish writing to console
     w.Close()
     <-done
     os.Stdout = originalStdout
@@ -410,7 +405,7 @@ func TestLogToConsoleOnly(t *testing.T) {
 }
 
 func TestLogToFileOnly(t *testing.T) {
-    // Verify that logging occurs only to a file and is not output to the console.
+    // Check that logging occurs only to file and not to console.
     logFile := filepath.Join(os.TempDir(), "test_log_to_file_only.txt")
     defer os.Remove(logFile)
 
@@ -427,7 +422,7 @@ func TestLogToFileOnly(t *testing.T) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
-    // Log a message to check file writing
+    // Log a message to check file output
     log.Info("Test message for file only")
 
     // Read the file content and check for the message
@@ -443,7 +438,7 @@ func TestLogToFileOnly(t *testing.T) {
 }
 
 func TestLogToFileAndConsole(t *testing.T) {
-    // Verify that logging occurs simultaneously to a file and the console.
+    // Check that logging occurs simultaneously to file and console.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
     r, w, _ := os.Pipe()
@@ -471,21 +466,21 @@ func TestLogToFileAndConsole(t *testing.T) {
         done <- true
     }()
 
-    // Log a message to check both file and console output
+    // Log a message to check output to file and console
     log.Info("Test message for file and console")
 
-    // Finish writing to the console
+    // Finish writing to console
     w.Close()
     <-done
     os.Stdout = originalStdout
 
-    // Check the console output
+    // Check for the message in the console
     consoleOutputStr := consoleOutput.String()
     if !strings.Contains(consoleOutputStr, "Test message for file and console") {
         t.Errorf("Expected 'Test message for file and console' in console output")
     }
 
-    // Check the file output
+    // Check for the message in the file
     fileOutput, err := os.ReadFile(logFile)
     if err != nil {
         t.Fatalf("Failed to read log file: %v", err)
@@ -497,7 +492,7 @@ func TestLogToFileAndConsole(t *testing.T) {
 }
 
 func TestLogInJsonFormat(t *testing.T) {
-    // Verify that logging occurs in JSON format.
+    // Check that logging occurs in JSON format.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
     r, w, _ := os.Pipe()
@@ -528,7 +523,7 @@ func TestLogInJsonFormat(t *testing.T) {
     // Log a message to check JSON output
     log.Info("Test message in JSON format")
 
-    // Finish writing to the console
+    // Finish writing to console
     w.Close()
     <-done
     os.Stdout = originalStdout
@@ -551,7 +546,7 @@ func TestLogInJsonFormat(t *testing.T) {
 }
 
 func TestDefaultValues(t *testing.T) {
-    // Verify that default values are correctly set when partially configuring.
+    // Check that default values are correctly substituted when partial configuration is provided.
     config := logger.LogConfig{
         FilePath: "", // File path not specified
     }
@@ -579,5 +574,82 @@ func TestDefaultValues(t *testing.T) {
     }
     if log.Config.RotationConfig.MaxAge != 30 {
         t.Errorf("Expected default RotationConfig.MaxAge to be 30, got %d", log.Config.RotationConfig.MaxAge)
+    }
+}
+
+func TestPrintMethods(t *testing.T) {
+    // Check that Print, Printf, and Println methods work correctly.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    config := logger.LogConfig{
+        FilePath:      "", // File path not specified
+        Format:        "standard",
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+
+    log, err := logger.NewLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to create logger: %v", err)
+    }
+
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Log messages to check Print, Printf, and Println methods
+    log.Print("Test Print message")
+    log.Printf("Test %s message", "Printf")
+    log.Println("Test Println message")
+
+    // Finish writing to console
+    w.Close()
+    <-done
+    os.Stdout = originalStdout
+
+    // Check console output
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Test Print message") {
+        t.Errorf("Expected 'Test Print message' in console output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Test Printf message") {
+        t.Errorf("Expected 'Test Printf message' in console output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Test Println message") {
+        t.Errorf("Expected 'Test Println message' in console output, got '%s'", output)
+    }
+}
+
+func TestEnsureLoggerInitializedFunction(t *testing.T) {
+    // Check that logger is initialized correctly.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    done := make(chan bool)
+    go func() {
+        io.Copy(&consoleOutput, r)
+        done <- true
+    }()
+
+    // Log a message before explicit initialization
+    logger.Info("Test message before explicit initialization")
+
+    // Close the writer and wait for the goroutine to finish
+    w.Close()
+    <-done
+    os.Stdout = originalStdout
+
+    // Check console output
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Test message before explicit initialization") {
+        t.Errorf("Expected 'Test message before explicit initialization' in console output, got '%s'", output)
     }
 }

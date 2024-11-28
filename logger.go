@@ -1,89 +1,59 @@
 // Package logger provides a customizable logging utility for Go with support for various log levels,
-// formats, console output and log rotation. The package includes functions for logging messages at
-// TRACE, DEBUG, INFO, WARNING, ERROR and FATAL levels.
-// Both text and JSON output formats are supported, as well as log file rotation configuration with
-// maximum size, number of backups and retention period settings.
-// The logger can output messages to both file and console with the ability to set minimum log levels
-// for each output type.
-// If logger initialization fails, an error message will be output to the console.
+// formats, console output, and log rotation. The package includes functions for logging messages at TRACE, DEBUG, INFO, WARNING, ERROR, and FATAL levels.
+// Both text and JSON output formats are supported, as well as log file rotation settings with maximum size, number of backups, and retention period.
+// The logger can output messages to both file and console with the ability to set the minimum logging level for each output type.
+// In case of logger initialization error, the error message will be printed to the console.
 //
 // Main features:
-//   - Logging at various levels (TRACE, DEBUG, INFO, WARNING, ERROR, FATAL)
-//   - Output format support: standard text and JSON
-//   - Log level configuration for file and console (can be set by string or number)
-//   - Optional log rotation with compression of old files
-//   - Colored console output for better visual perception
+//   - Logging at various levels (TRACE, DEBUG, INFO, WARNING, ERROR, FATAL).
+//   - Support for output formats: standard text and JSON.
+//   - Configurable logging levels for file and console (can be set by number or string).
+//   - Optional log rotation with the ability to compress old files.
+//   - Support for colored console output for better visual perception.
 //
-// Usage example:
-//    config := logger.LogConfig{
-//        FilePath: "./logs/app.log",
-//        Format: "standard",
-//        FileLevel: "debug",
-//        ConsoleLevel: "info",
-//        ConsoleOutput: true,
-//        EnableRotation: true,
-//        RotationConfig: logger.RotationConfig{
-//            MaxSize: 10,
-//            MaxBackups: 5,
-//            MaxAge: 30,
-//            Compress: true,
-//        },
-//    }
+// Example usage:
 //
-//    err := logger.InitLogger(config)
-//    if err != nil {
-//        fmt.Println("Logger initialization failed:", err)
-//        return
-//    }
-//    logger.Info("Example informational message")
+//	config := logger.LogConfig{
+//	    FilePath: "./logs/app.log",
+//	    Format: "standard",
+//	    FileLevel: "debug",
+//	    ConsoleLevel: "info",
+//	    ConsoleOutput: true,
+//	    EnableRotation: true,
+//	    RotationConfig: logger.RotationConfig{
+//	        MaxSize: 10,
+//	        MaxBackups: 5,
+//	        MaxAge: 30,
+//	        Compress: true,
+//	    },
+//	}
+//
+//	err := logger.InitLogger(config)
+//	if err != nil {
+//	    fmt.Println("Logger initialization failed:", err)
+//	    return
+//	}
+//	logger.Info("Example info message")
 package logger
 
 import (
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "os"
-    "path/filepath"
-    "runtime"
-    "strings"
-    "time"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/fatih/color"
-    "github.com/natefinch/lumberjack"
+	"github.com/fatih/color"
+	"github.com/natefinch/lumberjack"
 )
 
-// Global variable for logger instance
+// Global variable for the logger instance
 var logInstance *Logger
-
-// LogConfig represents configuration settings for the logger.
-type LogConfig struct {
-    FilePath       string         // Full path to the log file
-    Format         string         // Log format: "standard" or "json"
-    FileLevel      interface{}    // Log level for file output: can be string or number
-    ConsoleLevel   interface{}    // Log level for console output: can be string or number
-    ConsoleOutput  bool           // Whether to output logs to console
-    EnableRotation bool           // Whether to enable log rotation
-    RotationConfig RotationConfig // Settings for log rotation
-}
-
-// RotationConfig contains settings for log rotation
-type RotationConfig struct {
-    MaxSize    int  // Maximum size in megabytes before log rotation
-    MaxBackups int  // Maximum number of old log files to keep
-    MaxAge     int  // Maximum number of days to keep old log files
-    Compress   bool // Whether to compress old log files
-}
-
-// Logger represents a customizable logger with various configuration options
-type Logger struct {
-    FileLogger      *log.Logger
-    ConsoleLogger   *log.Logger
-    Config          LogConfig
-    FileLogLevel    int
-    ConsoleLogLevel int
-    LogLevelMap     map[string]int
-}
 
 // InitLogger initializes the logger and saves the instance in the global variable logInstance.
 //
@@ -96,10 +66,39 @@ func InitLogger(config LogConfig) error {
     var err error
     logInstance, err = NewLogger(config)
     if err != nil {
-        // Output error message to console
+        // Print error message to console
         fmt.Println("Logger initialization failed:", err)
     }
     return err
+}
+
+// LogConfig represents the configuration settings for the logger.
+type LogConfig struct {
+    FilePath       string         // Full path to the log file.
+    Format         string         // Log format: "standard" or "json".
+    FileLevel      interface{}    // Log level for file output: can be a string or a number.
+    ConsoleLevel   interface{}    // Log level for console output: can be a string or a number.
+    ConsoleOutput  bool           // Whether to output logs to the console.
+    EnableRotation bool           // Whether to enable log rotation.
+    RotationConfig RotationConfig // Settings for log rotation.
+}
+
+// RotationConfig contains settings for log rotation.
+type RotationConfig struct {
+    MaxSize    int  // Maximum size in megabytes before rotating logs.
+    MaxBackups int  // Maximum number of old log files to keep.
+    MaxAge     int  // Maximum number of days to keep old log files.
+    Compress   bool // Whether to compress old log files.
+}
+
+// Logger represents a customizable logger with various configuration options.
+type Logger struct {
+    FileLogger      *log.Logger
+    ConsoleLogger   *log.Logger
+    Config          LogConfig
+    FileLogLevel    int
+    ConsoleLogLevel int
+    LogLevelMap     map[string]int
 }
 
 // setDefaults sets default values for the logger configuration.
@@ -124,10 +123,32 @@ func setDefaults(config *LogConfig) {
     }
 }
 
+// defaultConfig returns the default logger configuration.
+func defaultConfig() LogConfig {
+    return LogConfig{
+        Format:        "standard",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+}
+
+var once sync.Once
+
+// ensureLoggerInitialized checks if the logger is initialized and initializes it with default settings if not.
+func ensureLoggerInitialized() {
+    once.Do(func() {
+        config := defaultConfig()
+        err := InitLogger(config)
+        if err != nil {
+            fmt.Println("Failed to initialize default logger:", err)
+        }
+    })
+}
+
 // NewLogger creates and returns a new Logger instance with the specified configuration.
 //
 // Arguments:
-//   - config (LogConfig): Logger configuration, including log level, output, and rotation settings.
+//   - config (LogConfig): Logger configuration including log level, output, and rotation settings.
 //
 // Returns:
 //   - (*Logger): Pointer to the new Logger instance.
@@ -139,12 +160,12 @@ func NewLogger(config LogConfig) (*Logger, error) {
     l := &Logger{
         Config: config,
         LogLevelMap: map[string]int{
-            "trace":   0,
-            "debug":   1,
-            "info":    2,
-            "warning": 3,
-            "error":   4,
-            "fatal":   5,
+            "trace":   5,
+            "debug":   4,
+            "info":    3,
+            "warning": 2,
+            "error":   1,
+            "fatal":   0,
         },
     }
 
@@ -158,8 +179,10 @@ func NewLogger(config LogConfig) (*Logger, error) {
             }
             return logLevel, nil
         case int:
-            if v < 0 || v > 5 {
-                return 0, fmt.Errorf("numeric log level out of range: %d (valid range is 0 to 5)", v)
+            if v < 0 {
+                return 0, nil // "fatal" level for values less than 0
+            } else if v > 5 {
+                return 5, nil // "trace" level for values greater than 5
             }
             return v, nil
         default:
@@ -182,7 +205,7 @@ func NewLogger(config LogConfig) (*Logger, error) {
     }
     l.ConsoleLogLevel = consoleLevel
 
-    // Setup file logging if a path is specified
+    // Set up file logging if a path is specified
     if config.FilePath != "" {
         dir := filepath.Dir(config.FilePath)
         if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -211,7 +234,7 @@ func NewLogger(config LogConfig) (*Logger, error) {
         l.FileLogger = nil // No file logger if FilePath is not set
     }
 
-    // Setup console output
+    // Set up console output
     if config.ConsoleOutput {
         l.ConsoleLogger = log.New(os.Stdout, "", 0)
     }
@@ -219,14 +242,15 @@ func NewLogger(config LogConfig) (*Logger, error) {
     return l, nil
 }
 
-// log is an internal method that logs messages with the specified level and arguments.
+// log is an internal method that writes messages with the specified level and arguments.
 func (l *Logger) log(level string, v ...interface{}) {
     msgLevel, ok := l.LogLevelMap[level]
-    if !ok {
+    if (!ok && level != "print") {
         return
     }
 
-    if msgLevel < l.FileLogLevel && msgLevel < l.ConsoleLogLevel {
+    // Now the check is for "higher or equal" for output
+    if (level != "print" && msgLevel > l.FileLogLevel && msgLevel > l.ConsoleLogLevel) {
         return
     }
 
@@ -239,7 +263,6 @@ func (l *Logger) log(level string, v ...interface{}) {
         file = "unknown"
         line = 0
     } else {
-        // Trim the file path to the project level
         file = trimPathToProject(file)
     }
 
@@ -262,13 +285,12 @@ func (l *Logger) log(level string, v ...interface{}) {
         logEntry = prefix + fmt.Sprint(v...)
     }
 
-    // Log to file only if file logger is set and level meets the threshold
-    if l.FileLogger != nil && msgLevel >= l.FileLogLevel {
+    // Check log level for file and console
+    if l.FileLogger != nil && (level == "print" || msgLevel <= l.FileLogLevel) {
         l.FileLogger.Println(logEntry)
     }
 
-    // Log to console if enabled and level meets the threshold
-    if l.Config.ConsoleOutput && msgLevel >= l.ConsoleLogLevel {
+    if l.Config.ConsoleOutput && (level == "print" || msgLevel <= l.ConsoleLogLevel) {
         colorFunc := color.New(color.FgWhite).SprintFunc()
         switch level {
         case "trace":
@@ -326,6 +348,7 @@ func findProjectDir() string {
 // Returns:
 //   - (LogConfig): Logger configuration used in logInstance.
 func GetLoggerConfig() LogConfig {
+    ensureLoggerInitialized()
     if logInstance != nil {
         return logInstance.Config
     }
@@ -334,51 +357,56 @@ func GetLoggerConfig() LogConfig {
 
 // Package-level wrapper functions for logger methods
 
-// Trace logs a message at the TRACE level if the log level allows it.
+// Trace logs a message at the TRACE level if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Trace(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Trace(v...)
     }
 }
 
-// Debug logs a message at the DEBUG level if the log level allows it.
+// Debug logs a message at the DEBUG level if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Debug(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Debug(v...)
     }
 }
 
-// Info logs a message at the INFO level if the log level allows it.
+// Info logs a message at the INFO level if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Info(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Info(v...)
     }
 }
 
-// Warning logs a message at the WARNING level if the log level allows it.
+// Warning logs a message at the WARNING level if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Warning(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Warning(v...)
     }
 }
 
-// Error logs a message at the ERROR level if the log level allows it.
+// Error logs a message at the ERROR level if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Error(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Error(v...)
     }
@@ -389,61 +417,67 @@ func Error(v ...interface{}) {
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Fatal(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Fatal(v...)
     }
 }
 
-// Tracef logs a formatted message at the TRACE level if the log level allows it.
+// Tracef logs a formatted message at the TRACE level if the logging level allows it.
 //
 // Arguments:
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Tracef(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Tracef(format, v...)
     }
 }
 
-// Debugf logs a formatted message at the DEBUG level if the log level allows it.
+// Debugf logs a formatted message at the DEBUG level if the logging level allows it.
 //
 // Arguments:
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Debugf(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Debugf(format, v...)
     }
 }
 
-// Infof logs a formatted message at the INFO level if the log level allows it.
+// Infof logs a formatted message at the INFO level if the logging level allows it.
 //
 // Arguments:
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Infof(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Infof(format, v...)
     }
 }
 
-// Warningf logs a formatted message at the WARNING level if the log level allows it.
+// Warningf logs a formatted message at the WARNING level if the logging level allows it.
 //
 // Arguments:
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Warningf(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Warningf(format, v...)
     }
 }
 
-// Errorf logs a formatted message at the ERROR level if the log level allows it.
+// Errorf logs a formatted message at the ERROR level if the logging level allows it.
 //
 // Arguments:
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Errorf(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Errorf(format, v...)
     }
@@ -455,74 +489,112 @@ func Errorf(format string, v ...interface{}) {
 //   - format (string): Format string.
 //   - v (...interface{}): Values for formatting the message.
 func Fatalf(format string, v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Fatalf(format, v...)
         os.Exit(1)
     }
 }
 
-// Traceln logs a message at the TRACE level with a newline if the log level allows it.
+// Traceln logs a message at the TRACE level with a new line if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Traceln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Traceln(v...)
     }
 }
 
-// Debugln logs a message at the DEBUG level with a newline if the log level allows it.
+// Debugln logs a message at the DEBUG level with a new line if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Debugln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Debugln(v...)
     }
 }
 
-// Infoln logs a message at the INFO level with a newline if the log level allows it.
+// Infoln logs a message at the INFO level with a new line if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Infoln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Infoln(v...)
     }
 }
 
-// Warningln logs a message at the WARNING level with a newline if the log level allows it.
+// Warningln logs a message at the WARNING level with a new line if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Warningln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Warningln(v...)
     }
 }
 
-// Errorln logs a message at the ERROR level with a newline if the log level allows it.
+// Errorln logs a message at the ERROR level with a new line if the logging level allows it.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Errorln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Errorln(v...)
     }
 }
 
-// Fatalln logs a message at the FATAL level with a newline and terminates the application.
+// Fatalln logs a message at the FATAL level with a new line and terminates the application.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func Fatalln(v ...interface{}) {
+    ensureLoggerInitialized()
     if logInstance != nil {
         logInstance.Fatalln(v...)
         os.Exit(1)
     }
 }
 
-// Instance methods for the logger
+// Print logs a message regardless of the logging level.
+func Print(v ...interface{}) {
+    ensureLoggerInitialized()
+    if logInstance != nil {
+        logInstance.Print(v...)
+    }
+}
+
+// Printf logs a formatted message regardless of the logging level.
+//
+// Arguments:
+//   - format (string): Format string.
+//   - v (...interface{}): Values for formatting the message.
+func Printf(format string, v ...interface{}) {
+    ensureLoggerInitialized()
+    if logInstance != nil {
+        logInstance.Printf(format, v...)
+    }
+}
+
+// Println logs a message with a new line regardless of the logging level.
+//
+// Arguments:
+//   - v (...interface{}): Message to log.
+func Println(v ...interface{}) {
+    ensureLoggerInitialized()
+    if logInstance != nil {
+        logInstance.Println(v...)
+    }
+}
+
+// Logger instance methods
 
 // Trace logs a message at the TRACE level.
 //
@@ -628,7 +700,7 @@ func (l *Logger) Fatalf(format string, v ...interface{}) {
     os.Exit(1)
 }
 
-// Traceln logs a message at the TRACE level with a newline.
+// Traceln logs a message at the TRACE level with a new line.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
@@ -636,7 +708,7 @@ func (l *Logger) Traceln(v ...interface{}) {
     l.log("trace", fmt.Sprintln(v...))
 }
 
-// Debugln logs a message at the DEBUG level with a newline.
+// Debugln logs a message at the DEBUG level with a new line.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
@@ -644,7 +716,7 @@ func (l *Logger) Debugln(v ...interface{}) {
     l.log("debug", fmt.Sprintln(v...))
 }
 
-// Infoln logs a message at the INFO level with a newline.
+// Infoln logs a message at the INFO level with a new line.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
@@ -652,7 +724,7 @@ func (l *Logger) Infoln(v ...interface{}) {
     l.log("info", fmt.Sprintln(v...))
 }
 
-// Warningln logs a message at the WARNING level with a newline.
+// Warningln logs a message at the WARNING level with a new line.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
@@ -660,7 +732,7 @@ func (l *Logger) Warningln(v ...interface{}) {
     l.log("warning", fmt.Sprintln(v...))
 }
 
-// Errorln logs a message at the ERROR level with a newline if the log level allows it.
+// Errorln logs a message at the ERROR level with a new line.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
@@ -668,11 +740,33 @@ func (l *Logger) Errorln(v ...interface{}) {
     l.log("error", fmt.Sprintln(v...))
 }
 
-// Fatalln logs a message at the FATAL level with a newline and terminates the application.
+// Fatalln logs a message at the FATAL level with a new line and terminates the application.
 //
 // Arguments:
 //   - v (...interface{}): Message to log.
 func (l *Logger) Fatalln(v ...interface{}) {
     l.log("fatal", fmt.Sprintln(v...))
     os.Exit(1)
+}
+
+// Print logs a message regardless of the logging level.
+func (l *Logger) Print(v ...interface{}) {
+    l.log("print", v...)
+}
+
+// Printf logs a formatted message regardless of the logging level.
+//
+// Arguments:
+//   - format (string): Format string.
+//   - v (...interface{}): Values for formatting the message.
+func (l *Logger) Printf(format string, v ...interface{}) {
+    l.log("print", fmt.Sprintf(format, v...))
+}
+
+// Println logs a message with a new line regardless of the logging level.
+//
+// Arguments:
+//   - v (...interface{}): Message to log.
+func (l *Logger) Println(v ...interface{}) {
+    l.log("print", fmt.Sprintln(v...))
 }
