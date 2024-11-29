@@ -55,7 +55,6 @@ import (
 // Global variable for the logger instance
 var (
     logInstance *Logger
-    once        sync.Once
     mu          sync.Mutex
 )
 // InitLogger initializes the logger and saves the instance in the global variable logInstance.
