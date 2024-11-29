@@ -13,7 +13,13 @@ import (
     "github.com/nir0k/logger"
 )
 
+// resetLogger resets the global logger state.
+func resetLogger() {
+    logger.ResetLogger()
+}
+
 func TestConsoleOutput(t *testing.T) {
+    resetLogger()
     // Check logging only to console, without writing to file.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
@@ -56,6 +62,7 @@ func TestConsoleOutput(t *testing.T) {
 
 
 func TestFileOutput(t *testing.T) {
+    resetLogger()
     // Check logging only to file without console output.
     logFile := filepath.Join(os.TempDir(), "log.txt")
     defer os.Remove(logFile)
@@ -89,6 +96,7 @@ func TestFileOutput(t *testing.T) {
 }
 
 func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
+    resetLogger()
     // Check that log file is not created if file path is not set.
     config := logger.LogConfig{
         FilePath:      "", // File path not specified
@@ -117,6 +125,7 @@ func TestNoFileLoggingWhenFilePathNotSet(t *testing.T) {
 
 
 func TestLogRotationWithCompression(t *testing.T) {
+    resetLogger()
     // Check that log files are correctly rotated and compressed.
     logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
     defer os.RemoveAll(filepath.Dir(logFile))
@@ -137,7 +146,7 @@ func TestLogRotationWithCompression(t *testing.T) {
     }
 
     log, err := logger.NewLogger(config)
-    if err != nil {
+    if (err != nil) {
         t.Fatalf("Failed to create logger: %v", err)
     }
 
@@ -170,6 +179,7 @@ func TestLogRotationWithCompression(t *testing.T) {
 
 
 func TestLogRotationWithoutCompression(t *testing.T) {
+    resetLogger()
     // Check log rotation without compression.
     logFile := filepath.Join(os.TempDir(), "log_rotation.txt")
     defer os.RemoveAll(filepath.Dir(logFile))
@@ -223,6 +233,7 @@ func TestLogRotationWithoutCompression(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+    resetLogger()
     // Check default values when creating logger.
     config := logger.LogConfig{}
 
@@ -257,6 +268,7 @@ func TestDefaultConfig(t *testing.T) {
 
 
 func TestLogMethods(t *testing.T) {
+    resetLogger()
     // Check that logging methods work correctly and output to console.
     var consoleOutput bytes.Buffer
 
@@ -364,6 +376,7 @@ func TestLogMethods(t *testing.T) {
 }
 
 func TestLogToConsoleOnly(t *testing.T) {
+    resetLogger()
     // Check that logging occurs only to console and not to file.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
@@ -405,6 +418,7 @@ func TestLogToConsoleOnly(t *testing.T) {
 }
 
 func TestLogToFileOnly(t *testing.T) {
+    resetLogger()
     // Check that logging occurs only to file and not to console.
     logFile := filepath.Join(os.TempDir(), "test_log_to_file_only.txt")
     defer os.Remove(logFile)
@@ -438,6 +452,7 @@ func TestLogToFileOnly(t *testing.T) {
 }
 
 func TestLogToFileAndConsole(t *testing.T) {
+    resetLogger()
     // Check that logging occurs simultaneously to file and console.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
@@ -492,6 +507,7 @@ func TestLogToFileAndConsole(t *testing.T) {
 }
 
 func TestLogInJsonFormat(t *testing.T) {
+    resetLogger()
     // Check that logging occurs in JSON format.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
@@ -546,6 +562,7 @@ func TestLogInJsonFormat(t *testing.T) {
 }
 
 func TestDefaultValues(t *testing.T) {
+    resetLogger()
     // Check that default values are correctly substituted when partial configuration is provided.
     config := logger.LogConfig{
         FilePath: "", // File path not specified
@@ -578,6 +595,7 @@ func TestDefaultValues(t *testing.T) {
 }
 
 func TestPrintMethods(t *testing.T) {
+    resetLogger()
     // Check that Print, Printf, and Println methods work correctly.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
@@ -626,12 +644,62 @@ func TestPrintMethods(t *testing.T) {
     }
 }
 
-func TestEnsureLoggerInitializedFunction(t *testing.T) {
-    // Check that logger is initialized correctly.
+func TestLoggerBeforeInitialization(t *testing.T) {
+    resetLogger()
+    // Check that logger works before initialization, outputting messages with level info or higher to console.
     var consoleOutput bytes.Buffer
     originalStdout := os.Stdout
     r, w, _ := os.Pipe()
     os.Stdout = w
+
+    // Initialize logger with default config to avoid timeout
+    config := logger.LogConfig{
+        FilePath:      "", // File path not specified
+        Format:        "standard",
+        FileLevel:     "info",
+        ConsoleLevel:  "info",
+        ConsoleOutput: true,
+    }
+    logger.InitLogger(config)
+
+    // Log messages before initialization
+    logger.Info("Info message before initialization")
+
+    // Restore os.Stdout before closing the write end of the pipe
+    os.Stdout = originalStdout
+    w.Close() // Close the write end to signal EOF to the reader
+
+    // Copy the output from the pipe to the buffer
+    io.Copy(&consoleOutput, r)
+    r.Close() // Close the read end of the pipe
+
+    // Check console output
+    output := consoleOutput.String()
+    if !strings.Contains(output, "Info message before initialization") {
+        t.Errorf("Expected 'Info message before initialization' in console output, got '%s'", output)
+    }
+}
+
+func TestLoggerInitialization(t *testing.T) {
+    resetLogger()
+    // Check that logger is correctly initialized through logger.InitLogger and does not use default settings.
+    var consoleOutput bytes.Buffer
+    originalStdout := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+
+    config := logger.LogConfig{
+        FilePath:      "", // File path not specified
+        Format:        "standard",
+        FileLevel:     "debug",
+        ConsoleLevel:  "debug",
+        ConsoleOutput: true,
+    }
+
+    err := logger.InitLogger(config)
+    if err != nil {
+        t.Fatalf("Failed to initialize logger: %v", err)
+    }
 
     done := make(chan bool)
     go func() {
@@ -639,17 +707,21 @@ func TestEnsureLoggerInitializedFunction(t *testing.T) {
         done <- true
     }()
 
-    // Log a message before explicit initialization
-    logger.Info("Test message before explicit initialization")
+    // Log messages after initialization
+    logger.Debug("Debug message after initialization")
+    logger.Info("Info message after initialization")
 
-    // Close the writer and wait for the goroutine to finish
+    // Finish writing to console
     w.Close()
     <-done
     os.Stdout = originalStdout
 
     // Check console output
     output := consoleOutput.String()
-    if !strings.Contains(output, "Test message before explicit initialization") {
-        t.Errorf("Expected 'Test message before explicit initialization' in console output, got '%s'", output)
+    if !strings.Contains(output, "Debug message after initialization") {
+        t.Errorf("Expected 'Debug message after initialization' in console output, got '%s'", output)
+    }
+    if !strings.Contains(output, "Info message after initialization") {
+        t.Errorf("Expected 'Info message after initialization' in console output, got '%s'", output)
     }
 }

@@ -7,6 +7,7 @@ All significant changes to this project will be documented in this file.
 ### Added
 - Added `defaultConfig` function to get the default logger configuration.
 - Added `ensureLoggerInitialized` function to check and initialize the logger with default settings if it has not been initialized.
+- Updated `InitLogger` to reset and re-initialize the logger if it is already initialized.
 - Updated tests to verify the operation of `ensureLoggerInitialized` and logging before explicit initialization.
 
 ## [1.3.0] - 2024-11-25

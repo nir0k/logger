@@ -53,9 +53,13 @@ import (
 )
 
 // Global variable for the logger instance
-var logInstance *Logger
-
+var (
+    logInstance *Logger
+    once        sync.Once
+    mu          sync.Mutex
+)
 // InitLogger initializes the logger and saves the instance in the global variable logInstance.
+// If the logger is already initialized, it will be reset and re-initialized with the new configuration.
 //
 // Arguments:
 //   - config (LogConfig): Logger configuration with settings for log level, format, file output, and rotation.
@@ -63,13 +67,30 @@ var logInstance *Logger
 // Returns:
 //   - error: Error if initialization failed, otherwise nil.
 func InitLogger(config LogConfig) error {
+    mu.Lock()
+    defer mu.Unlock()
+
+    // Reset the logger if it is already initialized
+    if logInstance != nil {
+        logInstance = nil
+    }
+
+    // Logger initialization
     var err error
     logInstance, err = NewLogger(config)
     if err != nil {
-        // Print error message to console
-        fmt.Println("Logger initialization failed:", err)
+        fmt.Println("Logger initialization error:", err)
+        return err
     }
-    return err
+
+    return nil
+}
+
+// ResetLogger resets the global logger state.
+func ResetLogger() {
+    mu.Lock()
+    defer mu.Unlock()
+    logInstance = nil
 }
 
 // LogConfig represents the configuration settings for the logger.
@@ -132,17 +153,16 @@ func defaultConfig() LogConfig {
     }
 }
 
-var once sync.Once
-
-// ensureLoggerInitialized checks if the logger is initialized and initializes it with default settings if not.
+// ensureLoggerInitialized ensures that the global logger instance is initialized.
+// If the logger is not initialized, it initializes it with the default configuration.
 func ensureLoggerInitialized() {
-    once.Do(func() {
-        config := defaultConfig()
-        err := InitLogger(config)
+    if logInstance == nil {
+        defaultConfig := defaultConfig()
+        err := InitLogger(defaultConfig)
         if err != nil {
-            fmt.Println("Failed to initialize default logger:", err)
+            fmt.Println("Logger initialization failed with default settings:", err)
         }
-    })
+    }
 }
 
 // NewLogger creates and returns a new Logger instance with the specified configuration.
